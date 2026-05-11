@@ -35,10 +35,13 @@ template <
     int EpiStages,
     typename Element,
     typename ElementSF,
+    typename ElementLambda,
     typename OutputType,
     typename SmemLayoutQ,
     typename SmemLayoutK,
     typename SmemLayoutV,
+    typename SmemLayoutLambdaQ,
+    typename SmemLayoutLambdaK,
     typename SmemLayoutDS,
     typename SmemLayoutO,
     typename SmemLayoutSFQ,
@@ -52,7 +55,8 @@ struct SharedStorageQKVOwithSF : cute::aligned_struct<128, _0>{
     cute::ArrayEngine<ElementSF, cute::cosize_v<SmemLayoutSFQ>> smem_SFQ;
     cute::ArrayEngine<ElementSF, cute::cosize_v<SmemLayoutSFK>> smem_SFK;
     cute::ArrayEngine<ElementSF, cute::cosize_v<SmemLayoutSFV>> smem_SFV;
-    alignas(1024) cute::ArrayEngine<float, cute::cosize_v<SmemLayoutDS>> smem_ds;
+    alignas(1024) cute::ArrayEngine<ElementLambda, cute::cosize_v<SmemLayoutLambdaQ>> smem_lambda_q;
+    alignas(1024) cute::ArrayEngine<ElementLambda, cute::cosize_v<SmemLayoutLambdaK>> smem_lambda_k;
     alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutV>> smem_v;
     alignas(1024) cute::ArrayEngine<OutputType, cute::cosize_v<SmemLayoutO>> smem_o;
     
@@ -91,6 +95,7 @@ struct Flash_fwd_kernel_traits {
     static constexpr int NumSFQK = kHeadDim / 16;
     static constexpr int NumSFPV = kBlockN / 16;
     using ElementSF = cutlass::float_ue4m3_t;
+    using ElementLambda = cutlass::bfloat16_t;
     using Element = cutlass::float_e2m1_t;
     using ElementAccum = float;
     using ElementOut = ElementOut_;
@@ -144,6 +149,8 @@ struct Flash_fwd_kernel_traits {
     using SmemLayoutDS = 
         decltype(tile_to_shape(SmemLayoutAtomDS{},
             make_shape(shape<0>(TileShape_MNK{}), shape<1>(TileShape_MNK{}), Int<kStages>{})));
+    using SmemLayoutLambdaQ = Layout<Shape<Int<kBlockM>>, Stride<_1>>;
+    using SmemLayoutLambdaK = Layout<Shape<Int<kBlockN>, Int<kStages>>, Stride<_1, Int<kBlockN>>>;
 
     using SmemCopyAtomQ = Copy_Atom<SM75_U32x4_LDSM_N, Element>;
     using SmemCopyAtomKV = Copy_Atom<SM75_U32x4_LDSM_N, Element>;
@@ -189,8 +196,8 @@ struct Flash_fwd_kernel_traits {
     using SmemLayoutAtomO = decltype(cutlass::gemm::collective::detail::ss_smem_selector<GMMA::Major::K, ElementOut,
         decltype(cute::get<0>(TileShape_MNK{})), decltype(cute::get<2>(TileShape_MNK{}))>());
     using SmemLayoutO = decltype(tile_to_shape(SmemLayoutAtomO{}, select<0, 2>(TileShape_MNK{}), Step<_1, _2>{}));
-    using SharedStorage = SharedStorageQKVOwithSF<kStages, EpiStages, Element, ElementSF, ElementOut,
-        SmemLayoutQ, SmemLayoutK, SmemLayoutV, SmemLayoutDS, 
+    using SharedStorage = SharedStorageQKVOwithSF<kStages, EpiStages, Element, ElementSF, ElementLambda, ElementOut,
+        SmemLayoutQ, SmemLayoutK, SmemLayoutV, SmemLayoutLambdaQ, SmemLayoutLambdaK, SmemLayoutDS,
         SmemLayoutO, SmemLayoutSFQ, SmemLayoutSFK, SmemLayoutSFVt>;
     using MainloopPipeline = typename cutlass::PipelineTmaAsync<kStages>;
     using PipelineState = typename cutlass::PipelineState<kStages>;
@@ -199,4 +206,3 @@ struct Flash_fwd_kernel_traits {
     using PipelineStateQ = typename cutlass::PipelineState<1>;
     using EpilogueBarrier = typename flash::OrderedSequenceBarrierVarGroupSize<EpiStages, 2>;
 };
-

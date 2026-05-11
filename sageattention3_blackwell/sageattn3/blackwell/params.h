@@ -38,6 +38,8 @@ struct Qkv_params {
     void *__restrict__ k_ptr;
     void *__restrict__ v_ptr;
     void *__restrict__ delta_s_ptr;
+    void *__restrict__ lambda_q_ptr;
+    void *__restrict__ lambda_k_ptr;
     // The QKV scale factor matrices.
     void *__restrict__ sfq_ptr;
     void *__restrict__ sfk_ptr;
@@ -55,6 +57,12 @@ struct Qkv_params {
     index_t ds_batch_stride;
     index_t ds_row_stride;
     index_t ds_head_stride;
+    index_t lambda_q_batch_stride;
+    index_t lambda_k_batch_stride;
+    index_t lambda_q_row_stride;
+    index_t lambda_k_row_stride;
+    index_t lambda_q_head_stride;
+    index_t lambda_k_head_stride;
     // The stride of the Q, K and V scale factor matrices.
     index_t sfq_batch_stride;
     index_t sfk_batch_stride;
@@ -95,7 +103,7 @@ struct Flash_fwd_params : public Qkv_params {
     void * __restrict__ softmax_lseaccum_ptr;
 
     // The dimensions.
-    int b, seqlen_q, seqlen_k, seqlen_knew, d, seqlen_q_rounded, seqlen_k_rounded, d_rounded, rotary_dim, unpadded_seqlen_k;
+    int b, seqlen_q, seqlen_k, seqlen_knew, d, seqlen_q_rounded, seqlen_k_rounded, d_rounded, rotary_dim, unpadded_seqlen_q, unpadded_seqlen_k;
     cutlass::FastDivmod head_divmod, m_block_divmod;
     int total_blocks;
     int seqlen_s;

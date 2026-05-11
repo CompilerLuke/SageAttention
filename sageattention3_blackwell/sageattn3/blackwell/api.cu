@@ -36,6 +36,7 @@ void set_params_fprop(Flash_fwd_params &params,
                       const size_t b,
                       const size_t seqlen_q,
                       const size_t seqlen_k,
+                      const size_t unpadded_seqlen_q,
                       const size_t unpadded_seqlen_k,
                       const size_t seqlen_q_rounded,
                       const size_t seqlen_k_rounded,
@@ -48,6 +49,8 @@ void set_params_fprop(Flash_fwd_params &params,
                       const at::Tensor k,
                       const at::Tensor v,
                       const at::Tensor delta_s,
+                      const at::Tensor lambda_q,
+                      const at::Tensor lambda_k,
                       at::Tensor out,
                       const at::Tensor sfq,
                       const at::Tensor sfk,
@@ -72,6 +75,8 @@ void set_params_fprop(Flash_fwd_params &params,
     params.k_ptr = k.data_ptr();
     params.v_ptr = v.data_ptr();
     params.delta_s_ptr = delta_s.data_ptr();
+    params.lambda_q_ptr = lambda_q.data_ptr();
+    params.lambda_k_ptr = lambda_k.data_ptr();
     params.sfq_ptr = sfq.data_ptr();
     params.sfk_ptr = sfk.data_ptr();
     params.sfv_ptr = sfv.data_ptr();
@@ -86,6 +91,10 @@ void set_params_fprop(Flash_fwd_params &params,
 
     params.ds_row_stride = delta_s.stride(-2);
     params.ds_head_stride = delta_s.stride(-3);
+    params.lambda_q_row_stride = lambda_q.stride(-1);
+    params.lambda_k_row_stride = lambda_k.stride(-1);
+    params.lambda_q_head_stride = lambda_q.stride(-2);
+    params.lambda_k_head_stride = lambda_k.stride(-2);
     
     params.sfq_row_stride = sfq.stride(-2);
     params.sfk_row_stride = sfk.stride(-2);
@@ -102,6 +111,8 @@ void set_params_fprop(Flash_fwd_params &params,
         params.k_batch_stride = k.stride(0) * 2;
         params.v_batch_stride = v.stride(0) * 2;
         params.ds_batch_stride = delta_s.stride(0);
+        params.lambda_q_batch_stride = lambda_q.stride(0);
+        params.lambda_k_batch_stride = lambda_k.stride(0);
         params.sfq_batch_stride = sfq.stride(0);
         params.sfk_batch_stride = sfk.stride(0);
         params.sfv_batch_stride = sfv.stride(0);
@@ -129,6 +140,7 @@ void set_params_fprop(Flash_fwd_params &params,
     params.h_h_k_ratio = h / h_k;
     params.seqlen_q = seqlen_q;
     params.seqlen_k = seqlen_k;
+    params.unpadded_seqlen_q = unpadded_seqlen_q;
     params.unpadded_seqlen_k = unpadded_seqlen_k;
     params.seqlen_q_rounded = seqlen_q_rounded;
     params.seqlen_k_rounded = seqlen_k_rounded;
@@ -207,7 +219,10 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
         const at::Tensor &sfq,
         const at::Tensor &sfk,
         const at::Tensor &sfv,
+        const at::Tensor &lambda_q,
+        const at::Tensor &lambda_k,
         const at::Tensor &delta_s,
+        int unpadded_q,
         int unpadded_k,
         c10::optional<at::Tensor> &out_,             // batch_size x seqlen_q x num_heads x head_size
         const float softmax_scale,
@@ -232,15 +247,22 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     TORCH_CHECK(sfk.dtype() == sfq_dtype, "query and key must have the same dtype");
     TORCH_CHECK(sfv.dtype() == sfq_dtype, "query and value must have the same dtype");
     CHECK_DEVICE(sfq); CHECK_DEVICE(sfk); CHECK_DEVICE(sfv);
+    TORCH_CHECK(lambda_q.dtype() == torch::kBFloat16, "lambda_q dtype must be bfloat16");
+    TORCH_CHECK(lambda_k.dtype() == torch::kBFloat16, "lambda_k dtype must be bfloat16");
+    CHECK_DEVICE(lambda_q); CHECK_DEVICE(lambda_k);
     
     TORCH_CHECK(q.stride(-1) == 1, "Input tensor must have contiguous last dimension");
     TORCH_CHECK(k.stride(-1) == 1, "Input tensor must have contiguous last dimension");
     TORCH_CHECK(v.stride(-1) == 1, "Input tensor must have contiguous last dimension");
     TORCH_CHECK(delta_s.stride(-1) == 1, "Input tensor must have contiguous last dimension");
+    TORCH_CHECK(lambda_q.stride(-1) == 1, "lambda_q tensor must have contiguous last dimension");
+    TORCH_CHECK(lambda_k.stride(-1) == 1, "lambda_k tensor must have contiguous last dimension");
 
     TORCH_CHECK(q.is_contiguous(), "Input tensor must be contiguous");
     TORCH_CHECK(k.is_contiguous(), "Input tensor must be contiguous");
     TORCH_CHECK(v.is_contiguous(), "Input tensor must be contiguous");
+    TORCH_CHECK(lambda_q.is_contiguous(), "lambda_q tensor must be contiguous");
+    TORCH_CHECK(lambda_k.is_contiguous(), "lambda_k tensor must be contiguous");
 
     const auto sizes = q.sizes();
     auto opts = q.options();
@@ -262,6 +284,8 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     CHECK_SHAPE(q, batch_size, num_heads, seqlen_q, head_size_og);
     CHECK_SHAPE(k, batch_size, num_heads_k, seqlen_k, head_size_og);
     CHECK_SHAPE(v, batch_size, num_heads_k, unpacked_head_size, seqlen_k/2);
+    CHECK_SHAPE(lambda_q, batch_size, num_heads, seqlen_q);
+    CHECK_SHAPE(lambda_k, batch_size, num_heads_k, seqlen_k);
     // CHECK_SHAPE(delta_s, batch_size, num_heads, seqlen_q / 128, seqlen_k);
     // CHECK_SHAPE(sfq, batch_size, seqlen_q, num_heads, unpacked_head_size);
     // CHECK_SHAPE(sfk, batch_size, seqlen_k, num_heads_k, unpacked_head_size);
@@ -289,11 +313,11 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     Flash_fwd_params params;
     set_params_fprop(params,
                      batch_size,
-                     seqlen_q, seqlen_k, unpadded_k,
+                     seqlen_q, seqlen_k, unpadded_q, unpadded_k,
                      seqlen_q_rounded, seqlen_k_rounded,
                      num_heads, num_heads_k,
                      unpacked_head_size, unpacked_head_size,
-                     q, k, v, delta_s, out, 
+                     q, k, v, delta_s, lambda_q, lambda_k, out,
                      sfq, sfk, sfv,
                      /*cu_seqlens_q_d=*/nullptr,
                      /*cu_seqlens_k_d=*/nullptr,

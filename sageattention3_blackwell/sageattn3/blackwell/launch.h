@@ -33,6 +33,7 @@ template<typename Kernel_traits, bool Is_causal>
 void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
     using Element = typename Kernel_traits::Element;
     using ElementSF = typename Kernel_traits::ElementSF;
+    using ElementLambda = typename Kernel_traits::ElementLambda;
     using ElementOut = typename Kernel_traits::ElementOut;
     using TileShape_MNK = typename Kernel_traits::TileShape_MNK;
     using ClusterShape = typename Kernel_traits::ClusterShape_MNK;
@@ -58,9 +59,17 @@ void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
             {params.seqlen_k, params.d, params.h_k, params.b},  // shape_SFK
             static_cast<ElementSF const*>(params.sfv_ptr),
             {params.d, params.seqlen_k, params.h_k, params.b},  // shape_SFVt
+            static_cast<ElementLambda const*>(params.lambda_q_ptr),
+            {params.seqlen_q, params.h, params.b},  // shape_LambdaQ
+            {params.lambda_q_row_stride, params.lambda_q_head_stride, params.lambda_q_batch_stride},
+            static_cast<ElementLambda const*>(params.lambda_k_ptr),
+            {params.seqlen_k, params.h_k, params.b},  // shape_LambdaK
+            {params.lambda_k_row_stride, params.lambda_k_head_stride, params.lambda_k_batch_stride},
             static_cast<float const*>(params.delta_s_ptr),
             {params.seqlen_s, params.seqlen_k, params.h_k, params.b},
             {params.ds_row_stride, _1{}, params.ds_head_stride, params.ds_batch_stride},
+            params.unpadded_seqlen_q,
+            params.unpadded_seqlen_k,
             params.scale_softmax_log2
         });
     typename CollectiveEpilogue::Params epilogue_params =
@@ -80,6 +89,17 @@ void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
     void *kernel;
     kernel = (void *)flash::compute_attn_ws<Kernel_traits, Is_causal, Scheduler>;
     int smem_size = sizeof(typename Kernel_traits::SharedStorage);
+    static int max_smem_optin = [] {
+        int device = 0;
+        int limit = 0;
+        C10_CUDA_CHECK(cudaGetDevice(&device));
+        C10_CUDA_CHECK(cudaDeviceGetAttribute(
+            &limit, cudaDevAttrMaxSharedMemoryPerBlockOptin, device));
+        return limit;
+    }();
+    TORCH_CHECK(smem_size <= max_smem_optin,
+                "kernel shared memory requirement ", smem_size,
+                " exceeds device opt-in limit ", max_smem_optin);
     if (smem_size >= 48 * 1024) {
        C10_CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
     }
@@ -98,8 +118,10 @@ void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
 
 template<typename T, int Headdim, typename O = cutlass::bfloat16_t>
 void run_mha_fwd_(Flash_fwd_params &params, cudaStream_t stream) {
-    BOOL_SWITCH(params.is_causal, Is_causal, [&] {
-        BOOL_SWITCH(params.per_block_mean, per_block, [&] {
+    constexpr bool Is_causal = true;
+    constexpr bool per_block = false;
+    //BOOL_SWITCH(params.is_causal, Is_causal, [&] {
+    //    BOOL_SWITCH(params.per_block_mean, per_block, [&] {
             if constexpr (Headdim == 64 || Headdim == 128) {
                 run_flash_fwd<
                     Flash_fwd_kernel_traits<Headdim, 128, 128, 3, 1, per_block, T, O>,
@@ -108,6 +130,6 @@ void run_mha_fwd_(Flash_fwd_params &params, cudaStream_t stream) {
             } else {
                 static_assert(Headdim == 64 || Headdim == 128, "Unsupported Headdim");
             }
-        });
-    });
+    //    });
+    //});
 }
