@@ -806,24 +806,17 @@ struct CollectiveMainloopFwd {
 
                     int row = int(get<0>(tScS(i)));
                     int col = int(get<1>(tScS(i)));
-                    int q_slot = row & (kQGroupStride - 1);
                     int k_slot = col >> 3;
                     float q_mean_k_res = __shfl_sync(uint32_t(-1), acc(q_mean_coord), thread_idx & 3);
-                    float q_res_k_mean = acc(k_mean_coord);
                     float q_mean_k_mean = __shfl_sync(uint32_t(-1), acc(qk_mean_coord), thread_idx & 3);
-                    if (q_slot == 0) {
-                        acc(i) = 0.f;
-                        continue;
-                    }
                     if (k_slot == 0) {
                         continue;
                     }
+                    float q_res_k_mean = acc(k_mean_coord);
                     float lambda_q = float(sLambdaQ(row));
                     float lambda_k = float(sLambdaK(col, smem_pipe_read_k.index()));
-                    acc(i) = acc(i) +
-                             lambda_q * q_mean_k_res +
-                             lambda_k * q_res_k_mean +
-                             lambda_q * lambda_k * q_mean_k_mean;
+                    float q_mean_term = q_mean_k_res + lambda_k * q_mean_k_mean;
+                    acc(i) = acc(i) + lambda_q * q_mean_term + lambda_k * q_res_k_mean;
                 }
             } else {
                 CUTLASS_PRAGMA_UNROLL
@@ -858,7 +851,6 @@ struct CollectiveMainloopFwd {
                     int k_slot = col >> 3;
                     int k_group = col & (kGroupsPerExpandedTile - 1);
                     float q_mean_k_res = __shfl_sync(uint32_t(-1), acc(q_mean_coord), thread_idx & 3);
-                    float q_res_k_mean = acc(k_mean_coord);
                     float q_mean_k_mean = __shfl_sync(uint32_t(-1), acc(qk_mean_coord), thread_idx & 3);
                     if (q_slot == 0) {
                         acc(i) = 0.f;
@@ -880,12 +872,11 @@ struct CollectiveMainloopFwd {
                     } else if (masked) {
                         acc(i) = -INFINITY;
                     } else {
+                        float q_res_k_mean = acc(k_mean_coord);
                         float lambda_q = float(sLambdaQ(row));
                         float lambda_k = float(sLambdaK(col, smem_pipe_read_k.index()));
-                        acc(i) = acc(i) +
-                                 lambda_q * q_mean_k_res +
-                                 lambda_k * q_res_k_mean +
-                                 lambda_q * lambda_k * q_mean_k_mean;
+                        float q_mean_term = q_mean_k_res + lambda_k * q_mean_k_mean;
+                        acc(i) = acc(i) + lambda_q * q_mean_term + lambda_k * q_res_k_mean;
                     }
                 }
             }
