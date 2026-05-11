@@ -780,44 +780,41 @@ struct CollectiveMainloopFwd {
             bool const needs_token_mask = needs_q_bounds || needs_k_bounds || needs_causal_mask;
 
             if (!needs_token_mask) {
-                CUTLASS_PRAGMA_UNROLL
-                for (int i = 0; i < size(acc); ++i) {
-                    auto local_coord = idx2crd(i, shape(acc));
-                    auto atom_coord = get<0>(local_coord);
-                    auto atom_n_coord = get<0>(atom_coord);
-                    auto q_mean_coord = make_coord(
-                        make_coord(
-                            atom_n_coord,
-                            _0{}),
-                        get<1>(local_coord),
-                        get<2>(local_coord));
-                    auto k_mean_coord = make_coord(
-                        make_coord(
-                            make_coord(get<0>(atom_n_coord), _0{}),
-                            get<1>(atom_coord)),
-                        get<1>(local_coord),
-                        _0{});
-                    auto qk_mean_coord = make_coord(
-                        make_coord(
-                            make_coord(get<0>(atom_n_coord), _0{}),
-                            _0{}),
-                        get<1>(local_coord),
-                        _0{});
+                int const lane = thread_idx & 31;
+                int const warp = thread_idx >> 5;
+                int const row_low = (warp << 4) + (lane >> 2);
+                int const row_high = row_low + 8;
+                int const k_group_base = (lane & 3) << 1;
+                float const lambda_q_low = float(sLambdaQ(row_low));
+                float const lambda_q_high = float(sLambdaQ(row_high));
+                float const q_mean_k_mean_even = __shfl_sync(uint32_t(-1), acc(0), thread_idx & 3);
+                float const q_mean_k_mean_odd = __shfl_sync(uint32_t(-1), acc(1), thread_idx & 3);
 
-                    int row = int(get<0>(tScS(i)));
-                    int col = int(get<1>(tScS(i)));
-                    int k_slot = col >> 3;
-                    float q_mean_k_res = __shfl_sync(uint32_t(-1), acc(q_mean_coord), thread_idx & 3);
-                    float q_mean_k_mean = __shfl_sync(uint32_t(-1), acc(qk_mean_coord), thread_idx & 3);
-                    if (k_slot == 0) {
-                        continue;
+                CUTLASS_PRAGMA_UNROLL
+                for (int block = 0; block < 4; ++block) {
+                    CUTLASS_PRAGMA_UNROLL
+                    for (int j = 0; j < 8; ++j) {
+                        int const i = block * 16 + j;
+                        int const k_slot = block * 4 + (j >> 1);
+                        if (k_slot == 0) {
+                            continue;
+                        }
+                        int const k_group = k_group_base + (j & 1);
+                        int const col = (k_slot << 3) + k_group;
+                        int const k_mean_low = j & 1;
+                        int const k_mean_high = 8 + (j & 1);
+                        float const q_mean_k_mean = (j & 1) ? q_mean_k_mean_odd : q_mean_k_mean_even;
+                        float q_mean_k_res = __shfl_sync(uint32_t(-1), acc(i), thread_idx & 3);
+                        float lambda_k = float(sLambdaK(col, smem_pipe_read_k.index()));
+                        float q_mean_term = q_mean_k_res + lambda_k * q_mean_k_mean;
+                        acc(i) = acc(i) + lambda_q_low * q_mean_term + lambda_k * acc(k_mean_low);
+                        acc(i + 8) = acc(i + 8) + lambda_q_high * q_mean_term + lambda_k * acc(k_mean_high);
                     }
-                    float q_res_k_mean = acc(k_mean_coord);
-                    float lambda_q = float(sLambdaQ(row));
-                    float lambda_k = float(sLambdaK(col, smem_pipe_read_k.index()));
-                    float q_mean_term = q_mean_k_res + lambda_k * q_mean_k_mean;
-                    acc(i) = acc(i) + lambda_q * q_mean_term + lambda_k * q_res_k_mean;
                 }
+                acc(0) = -INFINITY;
+                acc(1) = -INFINITY;
+                acc(8) = -INFINITY;
+                acc(9) = -INFINITY;
             } else {
                 CUTLASS_PRAGMA_UNROLL
                 for (int i = 0; i < size(acc); ++i) {
@@ -845,11 +842,8 @@ struct CollectiveMainloopFwd {
 
                     int row = int(get<0>(tScS(i)));
                     int col = int(get<1>(tScS(i)));
-
-                    int q_group = row >> 4;
                     int q_slot = row & (kQGroupStride - 1);
                     int k_slot = col >> 3;
-                    int k_group = col & (kGroupsPerExpandedTile - 1);
                     float q_mean_k_res = __shfl_sync(uint32_t(-1), acc(q_mean_coord), thread_idx & 3);
                     float q_mean_k_mean = __shfl_sync(uint32_t(-1), acc(qk_mean_coord), thread_idx & 3);
                     if (q_slot == 0) {
@@ -860,6 +854,8 @@ struct CollectiveMainloopFwd {
                         continue;
                     }
 
+                    int q_group = row >> 4;
+                    int k_group = col & (kGroupsPerExpandedTile - 1);
                     int q_original = q_tile_base + q_group * kResidualBlock + q_slot - 1;
                     int k_original = k_tile_base + k_group * kResidualBlock + k_slot - 1;
                     bool q_oob = q_original >= unpadded_seqlen_q;
@@ -879,14 +875,14 @@ struct CollectiveMainloopFwd {
                         acc(i) = acc(i) + lambda_q * q_mean_term + lambda_k * q_res_k_mean;
                     }
                 }
-            }
 
-            CUTLASS_PRAGMA_UNROLL
-            for (int i = 0; i < size(acc); ++i) {
-                int col = int(get<1>(tScS(i)));
-                int k_slot = col >> 3;
-                if (k_slot == 0) {
-                    acc(i) = -INFINITY;
+                CUTLASS_PRAGMA_UNROLL
+                for (int i = 0; i < size(acc); ++i) {
+                    int col = int(get<1>(tScS(i)));
+                    int k_slot = col >> 3;
+                    if (k_slot == 0) {
+                        acc(i) = -INFINITY;
+                    }
                 }
             }
         };
