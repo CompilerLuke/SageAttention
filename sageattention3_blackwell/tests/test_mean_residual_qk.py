@@ -128,8 +128,9 @@ def test_sageattn3_blackwell_specialized_constant_value_tile():
     assert out.max().item() <= 1.05
 
 
+@pytest.mark.parametrize("is_causal", [False, True])
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for the mean/residual kernel")
-def test_sageattn3_blackwell_specialized_random_smoke_matches_sdpa_loose():
+def test_sageattn3_blackwell_specialized_random_smoke_matches_sdpa_loose(is_causal):
     _skip_unless_specialized_blackwell_kernel()
 
     torch.manual_seed(6)
@@ -137,8 +138,8 @@ def test_sageattn3_blackwell_specialized_random_smoke_matches_sdpa_loose():
     k = torch.randn_like(q)
     v = torch.randn_like(q)
 
-    out = mr.sageattn3_blackwell(q, k, v, is_causal=True)
-    expected = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=True)
+    out = mr.sageattn3_blackwell(q, k, v, is_causal=is_causal)
+    expected = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=is_causal)
     torch.cuda.synchronize()
     diff = (out.float() - expected.float()).abs()
 
