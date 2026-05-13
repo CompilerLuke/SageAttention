@@ -63,13 +63,16 @@ The generated PNGs are split by layout so each view can be inspected directly:
 - Fragment layouts: `AtomLayoutA_TV`, `AtomLayoutB_TV`, and `AtomLayoutC_TV`
   are rendered as lane-ownership maps over their logical A/B/C tiles.
 - Shared-memory access maps: exact CuTe identity-tensor coordinates for the
-  source smem partitions used by `make_tiled_copy_A/B`. The copy-layout tensor
-  views are intentionally omitted.
+  source smem partitions used by `make_tiled_copy_A/B`. Each PNG first shows
+  the tile decomposition by warp group, then a single-warp color matrix showing
+  sparse lane ownership for the elements accessed by `G0`. The copy-layout
+  tensor views are intentionally omitted.
 
-In the shared maps, color is thread ID. `SmemLayoutQ` is shown as one full
-`128x128` map across `T0-T255`. `SmemLayoutK` and `SmemLayoutVt` are split by
-M-group and pipeline stage because the same K/Vt coordinates are reused by all
-8 M atom groups.
+In the shared maps, the top section uses one color per warp group. The bottom
+section shows only `G0`, with one color per lane/thread and gray for tile
+coordinates untouched by that warp. `SmemLayoutQ` shows the single `128x128`
+Q tile. `SmemLayoutK` and `SmemLayoutVt` show stage 0; stages 1/2 repeat with
+the stage offset, and each warp group rereads the full stage tile.
 
 Regenerate the checked-in PNGs after rebuilding `mainloop_tma_ws_debug` with:
 

@@ -368,6 +368,10 @@ def new_owner_map() -> list[list[int]]:
     return [[-1 for _ in range(TILE_N)] for _ in range(TILE_M)]
 
 
+def new_mask_map() -> list[list[bool]]:
+    return [[False for _ in range(TILE_N)] for _ in range(TILE_M)]
+
+
 def set_owner(owner: list[list[int]], m: int, n: int, thread: int) -> None:
     if not (0 <= m < TILE_M and 0 <= n < TILE_N):
         return
@@ -378,13 +382,12 @@ def set_owner(owner: list[list[int]], m: int, n: int, thread: int) -> None:
         owner[m][n] = -2
 
 
-def load_access_maps(debug_bin: Path) -> tuple[list[list[int]], dict[str, list[list[list[list[int]]]]]]:
-    q_owner = new_owner_map()
-    staged = {
-        "SmemLayoutK": [[new_owner_map() for _ in range(STAGES)] for _ in range(M_GROUPS)],
-        "SmemLayoutVt": [[new_owner_map() for _ in range(STAGES)] for _ in range(M_GROUPS)],
+def load_access_records(debug_bin: Path) -> dict[str, list[tuple[int, int, int, int]]]:
+    records: dict[str, list[tuple[int, int, int, int]]] = {
+        "SmemLayoutQ": [],
+        "SmemLayoutK": [],
+        "SmemLayoutVt": [],
     }
-
     proc = subprocess.Popen(
         [str(debug_bin), "--access-map-csv"],
         stdout=subprocess.PIPE,
@@ -407,12 +410,8 @@ def load_access_maps(debug_bin: Path) -> tuple[list[list[int]], dict[str, list[l
         m = int(m_s)
         n = int(n_s)
         stage = int(stage_s)
-        if layout == "SmemLayoutQ":
-            set_owner(q_owner, m, n, thread)
-        elif layout in staged:
-            group = thread // LANES
-            if 0 <= group < M_GROUPS and 0 <= stage < STAGES:
-                set_owner(staged[layout][group][stage], m, n, thread)
+        if layout in records:
+            records[layout].append((thread, m, n, stage))
 
     stderr = proc.stderr.read() if proc.stderr is not None else ""
     rc = proc.wait()
@@ -420,7 +419,11 @@ def load_access_maps(debug_bin: Path) -> tuple[list[list[int]], dict[str, list[l
         raise SystemExit(f"{debug_bin} --access-map-csv failed with {rc}:\n{stderr}")
     if not header_seen:
         raise SystemExit(f"{debug_bin} did not emit access-map CSV")
-    return q_owner, staged
+    return records
+
+
+def warp_color(warp: int) -> tuple[int, int, int]:
+    return thread_color(warp * LANES + 4)
 
 
 def map_to_image(owner: list[list[int]], scale: int) -> Image.Image:
@@ -436,6 +439,16 @@ def map_to_image(owner: list[list[int]], scale: int) -> Image.Image:
     return small.resize((TILE_N * scale, TILE_M * scale), Image.Resampling.NEAREST)
 
 
+def mask_to_image(mask: list[list[bool]], scale: int, color: tuple[int, int, int]) -> Image.Image:
+    small = Image.new("RGB", (TILE_N, TILE_M), (230, 234, 240))
+    px = small.load()
+    for m in range(TILE_M):
+        for n in range(TILE_N):
+            if mask[m][n]:
+                px[n, m] = color
+    return small.resize((TILE_N * scale, TILE_M * scale), Image.Resampling.NEAREST)
+
+
 def draw_grid_overlay(draw: ImageDraw.ImageDraw, x: int, y: int, scale: int) -> None:
     size = TILE_M * scale
     for i in range(0, TILE_M + 1, 16):
@@ -446,62 +459,137 @@ def draw_grid_overlay(draw: ImageDraw.ImageDraw, x: int, y: int, scale: int) -> 
     draw.rectangle((x, y, x + size, y + size), outline=(65, 72, 84), width=2)
 
 
-def draw_thread_legend(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
-    draw_text(draw, (x, y), "Thread color samples", fnt=FONT_H3)
-    samples = [0, 1, 31, 32, 63, 64, 127, 128, 191, 224, 255]
-    for i, thread in enumerate(samples):
-        sx = x + (i % 6) * 84
-        sy = y + 28 + (i // 6) * 26
-        rect(draw, (sx, sy, sx + 18, sy + 18), thread_color(thread), (255, 255, 255), 1)
-        draw_text(draw, (sx + 24, sy + 2), f"T{thread}", fnt=FONT_SMALL)
-    draw_text(draw, (x, y + 86), "Black means multiple thread IDs touched the same coordinate in that panel.", fill=(74, 83, 97), fnt=FONT_SMALL)
+def draw_lane_legend(draw: ImageDraw.ImageDraw, x: int, y: int, warp: int) -> None:
+    draw_text(draw, (x, y), f"Lane colors for G{warp}", fnt=FONT_H3)
+    for lane in range(LANES):
+        sx = x + (lane % 4) * 76
+        sy = y + 30 + (lane // 4) * 24
+        color = thread_color(warp * LANES + lane)
+        rect(draw, (sx, sy, sx + 18, sy + 18), color, (255, 255, 255), 1)
+        draw_text(draw, (sx + 24, sy + 2), f"L{lane}", fnt=FONT_SMALL)
 
 
-def render_smem_q(q_owner: list[list[int]]) -> None:
-    img, draw = new_canvas(
-        1180,
-        820,
-        "SmemLayoutQ thread access",
-        "CuTe identity tensor partitioned by make_tiled_copy_A. Color is thread ID.",
-    )
-    x, y, scale = 48, 138, 5
-    draw_text(draw, (x, y - 28), "128 x 128 Q tile, T0-T255", fnt=FONT_H2)
-    img.paste(map_to_image(q_owner, scale), (x, y))
-    draw_grid_overlay(draw, x, y, scale)
-    draw_thread_legend(draw, 760, 160)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    img.save(SMEM_Q_PNG)
+def select_records(
+    records: list[tuple[int, int, int, int]],
+    warp: int | None = None,
+    stage: int | None = None,
+) -> list[tuple[int, int, int, int]]:
+    selected = []
+    for thread, m, n, rec_stage in records:
+        if warp is not None and thread // LANES != warp:
+            continue
+        if stage is not None and rec_stage != stage:
+            continue
+        selected.append((thread, m, n, rec_stage))
+    return selected
 
 
-def render_smem_staged(filename: Path, title: str, staged_maps: list[list[list[list[int]]]]) -> None:
+def build_warp_mask(records: list[tuple[int, int, int, int]], warp: int, stage: int | None) -> list[list[bool]]:
+    mask = new_mask_map()
+    for _thread, m, n, _stage in select_records(records, warp=warp, stage=stage):
+        if 0 <= m < TILE_M and 0 <= n < TILE_N:
+            mask[m][n] = True
+    return mask
+
+
+def build_lane_owner(records: list[tuple[int, int, int, int]], warp: int, stage: int | None) -> list[list[int]]:
+    owner = new_owner_map()
+    for thread, m, n, _stage in select_records(records, warp=warp, stage=stage):
+        set_owner(owner, m, n, thread)
+    return owner
+
+
+def render_warp_masks(
+    img: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    records: list[tuple[int, int, int, int]],
+    x: int,
+    y: int,
+    stage: int | None,
+) -> int:
     scale = 2
     panel = TILE_M * scale
-    gap_x, gap_y = 22, 34
-    img, draw = new_canvas(
-        1080,
-        2840,
-        title,
-        "CuTe identity tensor partitioned by make_tiled_copy_B. Split by warp/M-group and pipeline stage.",
-    )
-    x, y = 48, 138
-    for stage in range(STAGES):
-        draw_text(draw, (x + 86 + stage * (panel + gap_x), y - 28), f"stage {stage}", fnt=FONT_H3)
-    for group in range(M_GROUPS):
-        row_y = y + group * (panel + gap_y)
-        draw_text(draw, (x, row_y + 98), f"G{group}\nT{group * 32}-T{group * 32 + 31}", fill=(58, 65, 78), fnt=FONT_SMALL)
-        for stage in range(STAGES):
-            px = x + 86 + stage * (panel + gap_x)
-            img.paste(map_to_image(staged_maps[group][stage], scale), (px, row_y))
-            draw_grid_overlay(draw, px, row_y, scale)
+    gap_x, gap_y = 26, 46
+    draw_text(draw, (x, y), "1. Tile decomposition by warp", fnt=FONT_H2)
+    stage_label = "single Q tile" if stage is None else f"stage {stage}"
+    draw_text(draw, (x, y + 28), f"Each mini-map shows the tile coordinates touched by one warp ({stage_label}).", fill=(78, 86, 100))
+    y0 = y + 70
+    for warp in range(M_GROUPS):
+        col = warp % 4
+        row = warp // 4
+        px = x + col * (panel + gap_x)
+        py = y0 + row * (panel + gap_y)
+        img.paste(mask_to_image(build_warp_mask(records, warp, stage), scale, warp_color(warp)), (px, py))
+        draw_grid_overlay(draw, px, py, scale)
+        draw_text(draw, (px, py - 20), f"G{warp} / T{warp * LANES}-T{warp * LANES + 31}", fill=(58, 65, 78), fnt=FONT_SMALL)
+    return y0 + 2 * panel + gap_y
+
+
+def render_lane_matrix(
+    img: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    records: list[tuple[int, int, int, int]],
+    x: int,
+    y: int,
+    warp: int,
+    stage: int | None,
+) -> int:
+    scale = 5
+    panel = TILE_M * scale
+    stage_label = "single Q tile" if stage is None else f"stage {stage}"
+    draw_text(draw, (x, y), f"2. Sparse lane assignment for G{warp} ({stage_label})", fnt=FONT_H2)
+    draw_text(draw, (x, y + 28), "Only one warp is shown here. Color is lane/thread ownership for accessed elements; gray is untouched by this warp.", fill=(78, 86, 100))
+    y0 = y + 70
+    img.paste(map_to_image(build_lane_owner(records, warp, stage), scale), (x, y0))
+    draw_grid_overlay(draw, x, y0, scale)
+    draw_lane_legend(draw, x + panel + 54, y0 + 8, warp)
+    return y0 + panel
+
+
+def render_smem_layout(
+    filename: Path,
+    title: str,
+    subtitle: str,
+    records: list[tuple[int, int, int, int]],
+    lane_stage: int | None,
+    mask_stage: int | None,
+) -> None:
+    width = 1340
+    height = 1600
+    img, draw = new_canvas(width, height, title, subtitle)
+    x = 48
+    masks_bottom = render_warp_masks(img, draw, records, x, 122, mask_stage)
+    render_lane_matrix(img, draw, records, x, masks_bottom + 50, warp=0, stage=lane_stage)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     img.save(filename)
 
 
 def render_shared_access(debug_bin: Path) -> None:
-    q_owner, staged = load_access_maps(debug_bin)
-    render_smem_q(q_owner)
-    render_smem_staged(SMEM_K_PNG, "SmemLayoutK thread access", staged["SmemLayoutK"])
-    render_smem_staged(SMEM_VT_PNG, "SmemLayoutVt thread access", staged["SmemLayoutVt"])
+    records = load_access_records(debug_bin)
+    render_smem_layout(
+        SMEM_Q_PNG,
+        "SmemLayoutQ shared-memory access",
+        "Q source partition from make_tiled_copy_A. Top: warp decomposition. Bottom: lane-sparse map for G0.",
+        records["SmemLayoutQ"],
+        lane_stage=None,
+        mask_stage=None,
+    )
+    render_smem_layout(
+        SMEM_K_PNG,
+        "SmemLayoutK shared-memory access",
+        "K source partition from make_tiled_copy_B. Stage 0 shown; each warp group reads the full K stage tile; stages 1/2 repeat with stage offset.",
+        records["SmemLayoutK"],
+        lane_stage=0,
+        mask_stage=0,
+    )
+    render_smem_layout(
+        SMEM_VT_PNG,
+        "SmemLayoutVt shared-memory access",
+        "Vt source partition from make_tiled_copy_B. Stage 0 shown; each warp group reads the full Vt stage tile; stages 1/2 repeat with stage offset.",
+        records["SmemLayoutVt"],
+        lane_stage=0,
+        mask_stage=0,
+    )
 
 
 def main() -> None:
