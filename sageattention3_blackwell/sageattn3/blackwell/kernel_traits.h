@@ -55,8 +55,8 @@ struct SharedStorageQKVOwithSF : cute::aligned_struct<128, _0>{
     cute::ArrayEngine<ElementSF, cute::cosize_v<SmemLayoutSFQ>> smem_SFQ;
     cute::ArrayEngine<ElementSF, cute::cosize_v<SmemLayoutSFK>> smem_SFK;
     cute::ArrayEngine<ElementSF, cute::cosize_v<SmemLayoutSFV>> smem_SFV;
-    alignas(1024) cute::ArrayEngine<ElementLambda, cute::cosize_v<SmemLayoutLambdaQ>> smem_lambda_q;
     alignas(1024) cute::ArrayEngine<ElementLambda, cute::cosize_v<SmemLayoutLambdaK>> smem_lambda_k;
+    alignas(1024) cute::ArrayEngine<float, cute::cosize_v<SmemLayoutDS>> smem_ds;
     alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutV>> smem_v;
     alignas(1024) cute::ArrayEngine<OutputType, cute::cosize_v<SmemLayoutO>> smem_o;
     

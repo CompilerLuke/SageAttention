@@ -59,9 +59,6 @@ void run_flash_fwd(Flash_fwd_params &params, cudaStream_t stream) {
             {params.seqlen_k, params.d, params.h_k, params.b},  // shape_SFK
             static_cast<ElementSF const*>(params.sfv_ptr),
             {params.d, params.seqlen_k, params.h_k, params.b},  // shape_SFVt
-            static_cast<ElementLambda const*>(params.lambda_q_ptr),
-            {params.seqlen_q, params.h, params.b},  // shape_LambdaQ
-            {params.lambda_q_row_stride, params.lambda_q_head_stride, params.lambda_q_batch_stride},
             static_cast<ElementLambda const*>(params.lambda_k_ptr),
             {params.seqlen_k, params.h_k, params.b},  // shape_LambdaK
             {params.lambda_k_row_stride, params.lambda_k_head_stride, params.lambda_k_batch_stride},

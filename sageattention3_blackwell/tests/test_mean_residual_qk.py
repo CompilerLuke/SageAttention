@@ -1,6 +1,13 @@
+from pathlib import Path
+import sys
+
 import pytest
 import torch
 import torch.nn.functional as F
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 try:
     from sageattention3_blackwell.sageattn3 import api as mr
@@ -10,6 +17,13 @@ except ModuleNotFoundError:
 
 def _device():
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+_FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
+_REAL_QKV_FIXTURES = [
+    pytest.param(_FIXTURE_DIR / "pythia6p9b_l0_h0_s256_qkv.pt", id="pythia_l0_h0_s256"),
+    pytest.param(_FIXTURE_DIR / "pythia6p9b_l0_h1_s128_qkv.pt", id="pythia_l0_h1_s128"),
+]
 
 
 @pytest.mark.parametrize(
@@ -146,6 +160,44 @@ def test_sageattn3_blackwell_specialized_random_smoke_matches_sdpa_loose(is_caus
     assert torch.isfinite(out).all()
     assert diff.mean().item() < 0.25
     assert diff.max().item() < 3.0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for the mean/residual kernel")
+@pytest.mark.parametrize("fixture_path", _REAL_QKV_FIXTURES)
+def test_sageattn3_blackwell_real_pythia_head_noncausal_matches_sdpa_quality(fixture_path):
+    _skip_unless_specialized_blackwell_kernel()
+
+    payload = torch.load(fixture_path, map_location="cpu")
+    q = payload["q"].to(device="cuda", dtype=torch.bfloat16).contiguous()
+    k = payload["k"].to(device="cuda", dtype=torch.bfloat16).contiguous()
+    v = payload["v"].to(device="cuda", dtype=torch.bfloat16).contiguous()
+    assert q.ndim == 4
+    assert q.shape[:2] == (1, 1)
+    assert q.shape[-1] == 128
+    assert k.shape == q.shape
+    assert v.shape == q.shape
+
+    out = mr.sageattn3_blackwell(q, k, v, is_causal=False)
+    expected = torch.nn.functional.scaled_dot_product_attention(q, k, v, is_causal=False)
+    torch.cuda.synchronize()
+
+    out_flat = out.float().reshape(-1)
+    expected_flat = expected.float().reshape(-1)
+    diff = out_flat - expected_flat
+    cos = F.cosine_similarity(out_flat, expected_flat, dim=0).item()
+    rel_l2 = (diff.norm() / expected_flat.norm().clamp_min(1e-12)).item()
+    mae = diff.abs().mean().item()
+    max_abs = diff.abs().max().item()
+    debug = (
+        f"cos={cos:.6f}, rel_l2={rel_l2:.6f}, mae={mae:.6f}, max_abs={max_abs:.6f}, "
+        f"api={mr.__file__}, k_strength={getattr(mr, 'MEAN_RESIDUAL_K_SMOOTHING_STRENGTH', None)}"
+    )
+
+    assert torch.isfinite(out).all()
+    assert cos > 0.99, debug
+    assert rel_l2 < 0.15, debug
+    assert mae < 0.02, debug
+    assert max_abs < 0.25, debug
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required for the specialized mean/residual kernel")

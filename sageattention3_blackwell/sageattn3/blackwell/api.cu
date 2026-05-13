@@ -332,7 +332,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
                      is_bf16
                     );
     // TODO: 132 sm count?
-    auto tile_count_semaphore = is_causal ? torch::full({1}, 132, opts.dtype(torch::kInt32)) : torch::empty({1}, opts.dtype(torch::kInt32));
+    auto tile_count_spemaphore = is_causal ? torch::full({1}, 132, opts.dtype(torch::kInt32)) : torch::empty({1}, opts.dtype(torch::kInt32));
     params.tile_count_semaphore = tile_count_semaphore.data_ptr<int>();
 
     if (seqlen_k > 0) {

@@ -6,7 +6,7 @@ the block-lambda kernel, then annotates each accumulator element with the
 current mean/residual layout fields:
 
   Q block-local, b=15: row = q_group * 16 + q_slot
-  K slot-major,  b=15: col = k_slot * 8 + k_group
+  K block-local, b=15: col = k_group * 16 + k_slot
 
 The important output is not performance. It is the ownership relation between a
 real residual/residual accumulator element and its reconstruction sources:
@@ -74,7 +74,7 @@ int main() {
     std::cout << "# block_n," << kBlockN << "\n";
     std::cout << "# head_dim," << kHeadDim << "\n";
     std::cout << "# tiled_mma_threads," << int(size(tiled_mma_qk)) << "\n";
-    std::cout << "tid,warp,lane,elem,row,col\n";
+    std::cout << "tid,warp,lane,elem,row,col,kmean_row_formula,kmean_col_formula\n";
 
     for (int tid = 0; tid < int(size(tiled_mma_qk)); ++tid) {
         auto thread_mma_qk = tiled_mma_qk.get_thread_slice(tid);
@@ -83,13 +83,25 @@ int main() {
             auto coord = tScS(i);
             int row = int(get<0>(coord));
             int col = int(get<1>(coord));
+            auto local_coord = idx2crd(i, shape(tScS));
+            auto atom_coord = get<0>(local_coord);
+            auto atom_n_coord = get<0>(atom_coord);
+            auto k_mean_coord = make_coord(
+                make_coord(
+                    make_coord(get<0>(atom_n_coord), _0{}),
+                    get<1>(atom_coord)),
+                get<1>(local_coord),
+                _0{});
+            auto kernel_kmean = tScS(k_mean_coord);
             std::cout
                 << tid << ","
                 << (tid / 32) << ","
                 << (tid % 32) << ","
                 << i << ","
                 << row << ","
-                << col << "\n";
+                << col << ","
+                << int(get<0>(kernel_kmean)) << ","
+                << int(get<1>(kernel_kmean)) << "\n";
         }
     }
     return 0;
@@ -134,6 +146,9 @@ class AnnotatedEntry:
     k_mean_same_thread: bool | None
     qk_mean_same_warp: bool | None
     qk_mean_expected_lane: bool | None
+    kernel_kmean_row: int
+    kernel_kmean_col: int
+    kernel_kmean_matches: bool
 
 
 def repo_root() -> Path:
@@ -211,7 +226,7 @@ def owner_tuple(owner: Owner | None) -> tuple[int | None, int | None, int | None
     return owner.tid, owner.lane, owner.elem
 
 
-def annotate(rows: list[dict[str, int]], residual_block: int) -> list[AnnotatedEntry]:
+def annotate(rows: list[dict[str, int]], residual_block: int, k_layout: str) -> list[AnnotatedEntry]:
     group_width = residual_block + 1
     if 128 % group_width != 0:
         raise SystemExit(f"128 is not divisible by residual_block + 1 ({group_width})")
@@ -230,12 +245,19 @@ def annotate(rows: list[dict[str, int]], residual_block: int) -> list[AnnotatedE
     for row in rows:
         q_group = row["row"] // group_width
         q_slot = row["row"] % group_width
-        k_slot = row["col"] // groups_per_tile
-        k_group = row["col"] % groups_per_tile
+        if k_layout == "slot_major":
+            k_slot = row["col"] // groups_per_tile
+            k_group = row["col"] % groups_per_tile
+            k_mean_col = k_group
+        elif k_layout == "block_local":
+            k_group = row["col"] // group_width
+            k_slot = row["col"] % group_width
+            k_mean_col = k_group * group_width
+        else:
+            raise SystemExit(f"unsupported K layout: {k_layout}")
         is_real = q_slot != 0 and k_slot != 0
 
         q_mean_row = q_group * group_width
-        k_mean_col = k_group
 
         q_mean = owners.get((q_mean_row, row["col"]))
         k_mean = owners.get((row["row"], k_mean_col))
@@ -274,6 +296,12 @@ def annotate(rows: list[dict[str, int]], residual_block: int) -> list[AnnotatedE
                 k_mean_same_thread=None if k_mean is None else k_mean.tid == row["tid"],
                 qk_mean_same_warp=None if qk_mean is None else qk_mean.warp == row["warp"],
                 qk_mean_expected_lane=None if qk_mean is None else qk_mean.warp == row["warp"] and qk_mean.lane == expected_lane,
+                kernel_kmean_row=row["kmean_row_formula"],
+                kernel_kmean_col=row["kmean_col_formula"],
+                kernel_kmean_matches=(
+                    row["kmean_row_formula"] == row["row"]
+                    and row["kmean_col_formula"] == k_mean_col
+                ),
             )
         )
     return annotated
@@ -331,6 +359,7 @@ def summarize(metadata: dict[str, str], entries: list[AnnotatedEntry], args: arg
     print(f"  q_mean_k_res same warp:       {count_real('q_mean_same_warp')}/{len(real)}")
     print(f"  q_mean_k_res lane == lane&3:  {count_real('q_mean_expected_lane')}/{len(real)}")
     print(f"  q_res_k_mean same thread:     {count_real('k_mean_same_thread')}/{len(real)}")
+    print(f"  kernel k_mean_coord exact:    {count_real('kernel_kmean_matches')}/{len(real)}")
     print(f"  q_mean_k_mean same warp:      {count_real('qk_mean_same_warp')}/{len(real)}")
     print(f"  q_mean_k_mean lane == lane&3: {count_real('qk_mean_expected_lane')}/{len(real)}")
     print()
@@ -340,7 +369,10 @@ def summarize(metadata: dict[str, str], entries: list[AnnotatedEntry], args: arg
     print(f"  qk_mean hoisted only:                {entries_per_thread} + {qk_mean_shuffles} = {entries_per_thread + qk_mean_shuffles}")
     print(f"  paired q_mean + qk hoist:            {paired_q_mean_shuffles} + {qk_mean_shuffles} = {paired_q_mean_shuffles + qk_mean_shuffles}")
     print(f"  paired lower bound if skipping K0:   {useful_q_mean_pairs} + {qk_mean_shuffles} = {useful_q_mean_pairs + qk_mean_shuffles}")
-    print("  current no-mask path uses the paired lower bound and masks K0 by direct accumulator index")
+    if args.k_layout == "slot_major":
+        print("  slot-major no-mask path uses the paired lower bound and masks K0 by direct accumulator index")
+    else:
+        print("  block-local path currently uses the scalar mask/correction loop")
 
     by_warp: dict[int, list[AnnotatedEntry]] = {}
     for entry in entries:
@@ -374,7 +406,7 @@ def summarize(metadata: dict[str, str], entries: list[AnnotatedEntry], args: arg
         print(f"  showing{suffix}; use --sample-limit 0 or --dump-csv for the full layout")
     print(
         "  tid lane elem | row col | q(g,s) k(g,s) | "
-        "qmean(t,l,e) kmean(t,l,e) qkmean(t,l,e)"
+        "qmean(t,l,e) kmean(t,l,e) qkmean(t,l,e) | kernel_kmean(row,col)"
     )
     for entry in sample:
         print(
@@ -383,7 +415,8 @@ def summarize(metadata: dict[str, str], entries: list[AnnotatedEntry], args: arg
             f"({entry.q_group:1d},{entry.q_slot:2d}) ({entry.k_group:1d},{entry.k_slot:2d}) | "
             f"({entry.q_mean_tid},{entry.q_mean_lane},{entry.q_mean_elem}) "
             f"({entry.k_mean_tid},{entry.k_mean_lane},{entry.k_mean_elem}) "
-            f"({entry.qk_mean_tid},{entry.qk_mean_lane},{entry.qk_mean_elem})"
+            f"({entry.qk_mean_tid},{entry.qk_mean_lane},{entry.qk_mean_elem}) | "
+            f"({entry.kernel_kmean_row},{entry.kernel_kmean_col})"
         )
 
 
@@ -393,6 +426,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--block-n", type=int, default=128)
     parser.add_argument("--head-dim", type=int, default=128)
     parser.add_argument("--residual-block", type=int, default=15, help="Mean/residual block size b; group width is b + 1.")
+    parser.add_argument("--k-layout", choices=["block_local", "slot_major"], default="block_local")
     parser.add_argument("--cuda-arch", default="120a", help="CUDA arch suffix, e.g. 120a.")
     parser.add_argument("--nvcc", default="nvcc")
     parser.add_argument("--build-dir", type=Path)
@@ -413,7 +447,7 @@ def main() -> None:
     root = repo_root()
     exe = build_probe(args, root)
     metadata, rows = read_probe(exe)
-    entries = annotate(rows, args.residual_block)
+    entries = annotate(rows, args.residual_block, args.k_layout)
     if args.dump_csv:
         write_csv(args.dump_csv, entries)
         print(f"Wrote {args.dump_csv}")

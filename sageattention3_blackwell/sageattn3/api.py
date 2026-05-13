@@ -33,6 +33,8 @@ except ImportError:  # pragma: no cover - depends on local extension build
 
 MEAN_RESIDUAL_BLOCK_SIZE = 15
 MEAN_RESIDUAL_EXPANDED_TILE = 128
+MEAN_RESIDUAL_K_SMOOTHING_STRENGTH = 0.1
+MEAN_RESIDUAL_K_LAYOUT = "block_local"
 
 
 @triton.jit
@@ -151,6 +153,7 @@ def decompose_mean_residual_blocks(
     block_size: int = MEAN_RESIDUAL_BLOCK_SIZE,
     layout: str = "block_local",
     eps: float = 1e-6,
+    smoothing_strength: float = 1.0,
 ):
     if x.ndim != 4:
         raise ValueError("expected x with shape [B, H, L, D]")
@@ -166,6 +169,7 @@ def decompose_mean_residual_blocks(
     lambda_vals = (
         (blocks.float() * mean_f.unsqueeze(-2)).sum(dim=-1, keepdim=True) / denom.unsqueeze(-2)
     ).squeeze(-1).to(x.dtype)
+    lambda_vals = (lambda_vals.float() * smoothing_strength).to(x.dtype)
     residual = blocks - lambda_vals.unsqueeze(-1) * mean.unsqueeze(-2)
     expanded = torch.cat([mean.unsqueeze(-2), residual], dim=-2)
     lambda_expanded = torch.cat(
@@ -261,6 +265,35 @@ def expand_v_for_mean_residual_blocks(
     return _pack_group_slots(expanded, block_size, layout, value_ndim=1).contiguous(), original_len
 
 
+def _pack_k_scores_for_layout(
+    scores: torch.Tensor,
+    block_size: int = MEAN_RESIDUAL_BLOCK_SIZE,
+    layout: str = "slot_major",
+):
+    group_width, groups_per_tile, token_tile = _mean_residual_tile_params(block_size)
+    if scores.size(-1) % token_tile != 0:
+        raise ValueError("score columns must be padded to the K token tile")
+    tiles = scores.size(-1) // token_tile
+    blocks = scores.reshape(*scores.shape[:-1], tiles, groups_per_tile, block_size)
+    expanded = torch.zeros(
+        *scores.shape[:-1],
+        tiles,
+        groups_per_tile,
+        group_width,
+        device=scores.device,
+        dtype=scores.dtype,
+    )
+    expanded[..., 1:] = blocks
+    return _pack_group_slots(expanded, block_size, layout).contiguous()
+
+
+def _pack_k_scores_for_slot_major(
+    scores: torch.Tensor,
+    block_size: int = MEAN_RESIDUAL_BLOCK_SIZE,
+):
+    return _pack_k_scores_for_layout(scores, block_size, "slot_major")
+
+
 def pack_probs_q_mean_residual_blocks(
     probs: torch.Tensor,
     block_size: int = MEAN_RESIDUAL_BLOCK_SIZE,
@@ -336,20 +369,31 @@ def mean_residual_attention_reference(
 
 
 def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_mean: bool = True):
-
-    del per_block_mean
-    q_packed, lambda_q, q_original_len = decompose_mean_residual_blocks(q, layout="block_local")
-    k_packed, lambda_k, k_original_len = decompose_mean_residual_blocks(k, layout="slot_major")
-    v_packed, v_original_len = expand_v_for_mean_residual_blocks(v, layout="slot_major")
-    delta_s = torch.empty(
+    q_original_len = q.size(-2)
+    _, _, k_token_tile = _mean_residual_tile_params()
+    q_packed = _pad_tokens(q, MEAN_RESIDUAL_EXPANDED_TILE)
+    k = k - k.mean(dim=-2, keepdim=True)
+    k_padded = _pad_tokens(k, k_token_tile)
+    if per_block_mean:
+        q_packed, q_mean = triton_group_mean(q_packed)
+    else:
+        q_mean = q_packed.mean(dim=-2, keepdim=True)
+        q_packed = q_packed - q_mean
+    k_packed, lambda_k, k_original_len = decompose_mean_residual_blocks(
+        k,
+        layout=MEAN_RESIDUAL_K_LAYOUT,
+        smoothing_strength=MEAN_RESIDUAL_K_SMOOTHING_STRENGTH,
+    )
+    v_packed, v_original_len = expand_v_for_mean_residual_blocks(v, layout=MEAN_RESIDUAL_K_LAYOUT)
+    delta_s_compact = torch.matmul(q_mean, k_padded.transpose(-2, -1)).to(torch.float32)
+    delta_s = _pack_k_scores_for_layout(delta_s_compact, layout=MEAN_RESIDUAL_K_LAYOUT)
+    lambda_q = torch.empty(
         q_packed.size(0),
         q_packed.size(1),
-        MEAN_RESIDUAL_EXPANDED_TILE,
-        k_packed.size(2),
+        q_packed.size(2),
         device=q.device,
-        dtype=torch.float32,
+        dtype=torch.bfloat16,
     )
-    lambda_q = lambda_q.to(torch.bfloat16).contiguous()
     lambda_k = lambda_k.to(torch.bfloat16).contiguous()
     return q_packed, k_packed, v_packed, delta_s, lambda_q, lambda_k, q_original_len, k_original_len, v_original_len
 
@@ -452,4 +496,4 @@ def sageattn3_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_
         per_block_mean,
         is_bf16,
     )[0]
-    return unpack_q_block_local_output(o_expanded, QL).contiguous()
+    return o_expanded[..., :QL, :].contiguous()
