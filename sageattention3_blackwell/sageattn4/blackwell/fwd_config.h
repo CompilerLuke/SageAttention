@@ -4,7 +4,7 @@
 
 #include "params.h"
 
-#define SAGEATTN4_FWD_SPECIALIZATION_HEADER "generated/sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1.h"
+#define SAGEATTN4_FWD_SPECIALIZATION_HEADER "sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1.h"
 #define SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1
 #define SAGEATTN4_FWD_FUNCTION_PREFIX sageattn4_hdim128_bm128_bn128_s3_blockmean1_
 #define SAGEATTN4_FWD_HEAD_DIM 128

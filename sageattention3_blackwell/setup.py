@@ -1,6 +1,5 @@
 import warnings
 import os
-import sys
 import sysconfig
 from pathlib import Path
 from packaging.version import parse, Version
@@ -50,11 +49,6 @@ def check_if_cuda_home_none(global_option: str) -> None:
 
 def append_nvcc_threads(nvcc_extra_args):
     return nvcc_extra_args + ["--threads", "4"]
-
-
-def generate_blackwell_specialized_headers():
-    script = repo_dir / "sageattn4" / "blackwell" / "generate_specialized_headers.py"
-    subprocess.run([sys.executable, str(script)], check=True)
 
 
 def python_nvidia_include_dirs():
@@ -107,7 +101,6 @@ if not SKIP_CUDA_BUILD:
     # https://github.com/pytorch/pytorch/blob/8472c24e3b5b60150096486616d98b7bea01500b/torch/utils/cpp_extension.py#L920
     if FORCE_CXX11_ABI:
         torch._C._GLIBCXX_USE_CXX11_ABI = True
-    generate_blackwell_specialized_headers()
     cutlass_dir = repo_dir / "csrc" / "cutlass"
     (repo_dir / "csrc").mkdir(parents=True, exist_ok=True)
     if not cutlass_dir.exists():

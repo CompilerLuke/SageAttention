@@ -75,23 +75,7 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-set(SAGEATTN4_GENERATED_DIR "${CMAKE_CURRENT_LIST_DIR}/generated")
-set(SAGEATTN4_GENERATED_HEADER "${SAGEATTN4_GENERATED_DIR}/sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1.h")
-set(SAGEATTN4_GENERATED_STAMP "${CMAKE_CURRENT_BINARY_DIR}/sageattn4_generated_headers.stamp")
 set(SAGEATTN4_SPECIALIZED_KERNEL_SOURCE "${CMAKE_CURRENT_LIST_DIR}/fwd_kernel.cu")
-add_custom_command(
-  OUTPUT "${SAGEATTN4_GENERATED_STAMP}"
-  BYPRODUCTS "${SAGEATTN4_GENERATED_HEADER}"
-  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/generate_specialized_headers.py"
-          --output-dir "${SAGEATTN4_GENERATED_DIR}"
-  COMMAND "${CMAKE_COMMAND}" -E touch "${SAGEATTN4_GENERATED_STAMP}"
-  DEPENDS "${CMAKE_CURRENT_LIST_DIR}/generate_specialized_headers.py"
-          "${CMAKE_CURRENT_LIST_DIR}/specialized_codegen.py"
-          "${CMAKE_CURRENT_LIST_DIR}/generated_templates/sageattn4_fwd_specialization.h.in"
-  COMMENT "Generating SageAttention4 Blackwell specialized type headers"
-  VERBATIM
-)
-add_custom_target(sageattn4_generated_headers DEPENDS "${SAGEATTN4_GENERATED_STAMP}")
 
 set(NVIDIA_CUDA_LIBRARY_HEADER_SHIM_DIR "")
 if(NVIDIA_CUDA_PACKAGE_INCLUDE_DIR)
@@ -114,7 +98,6 @@ endif()
 
 file(GLOB BLACKWELL_HEADERS CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_LIST_DIR}/*.h"
-  "${CMAKE_CURRENT_LIST_DIR}/generated/*.h"
 )
 file(GLOB QUANTIZATION_HEADERS CONFIGURE_DEPENDS "${SAGEATTN3_DIR}/quantization/*.h")
 
@@ -197,7 +180,6 @@ add_library(fp4attn4_cuda MODULE
   "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE}"
   ${BLACKWELL_HEADERS}
 )
-add_dependencies(fp4attn4_cuda sageattn4_generated_headers)
 configure_sageattn4_cuda_extension(fp4attn4_cuda)
 
 add_library(fp4quant4_cuda MODULE
