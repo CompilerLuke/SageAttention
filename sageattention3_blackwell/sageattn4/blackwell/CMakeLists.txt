@@ -23,14 +23,7 @@ get_filename_component(REPO_ROOT "${SAGEATTN3_DIR}/.." ABSOLUTE)
 set(CUTLASS_DIR "${REPO_ROOT}/csrc/cutlass" CACHE PATH "CUTLASS checkout used by setup.py")
 set(SAGEATTN3_CUDA_ARCH "compute_120a,code=sm_120a" CACHE STRING "NVCC -gencode arch/code pair")
 set(SAGEATTN3_PYTHON_EXECUTABLE "/venv/main/bin/python" CACHE FILEPATH "Python executable used to query PyTorch")
-set(SAGEATTN4_DEBUG_HEADDIM "128" CACHE STRING "mainloop_tma_ws_debug head dimension")
-set(SAGEATTN4_DEBUG_BLOCK_M "128" CACHE STRING "mainloop_tma_ws_debug block M")
-set(SAGEATTN4_DEBUG_BLOCK_N "128" CACHE STRING "mainloop_tma_ws_debug block N")
-set(SAGEATTN4_DEBUG_STAGES "3" CACHE STRING "mainloop_tma_ws_debug pipeline stages")
-set(SAGEATTN4_DEBUG_CLUSTER_M "1" CACHE STRING "mainloop_tma_ws_debug cluster M")
-set(SAGEATTN4_DEBUG_BLOCK_MEAN "1" CACHE STRING "mainloop_tma_ws_debug block mean flag")
-set(SAGEATTN4_DEBUG_IS_CAUSAL "0" CACHE STRING "mainloop_tma_ws_debug causal flag")
-set(SAGEATTN4_DEBUG_THREAD_IDX "0" CACHE STRING "mainloop_tma_ws_debug consumer thread index")
+set(SAGEATTN4_CUDA_FAST_COMPILE "mid" CACHE STRING "nvcc --Ofast-compile level for CMake builds: 0, min, mid, or max")
 
 if(NOT EXISTS "${SAGEATTN3_PYTHON_EXECUTABLE}")
   message(FATAL_ERROR "Expected Python executable at ${SAGEATTN3_PYTHON_EXECUTABLE}")
@@ -39,6 +32,15 @@ set(Python3_EXECUTABLE "${SAGEATTN3_PYTHON_EXECUTABLE}" CACHE FILEPATH "Python e
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(CUDAToolkit REQUIRED)
+find_path(SAGEATTN4_CUDA_CCCL_INCLUDE_DIR
+  cuda/std/utility
+  HINTS
+    "${CUDAToolkit_TARGET_DIR}/include/cccl"
+    "${CUDAToolkit_INCLUDE_DIRS}/cccl"
+    "/usr/local/cuda/targets/x86_64-linux/include/cccl"
+    "/usr/local/cuda-13.1/targets/x86_64-linux/include/cccl"
+    "/usr/local/cuda-12.9/targets/x86_64-linux/include/cccl"
+)
 
 set(TORCH_INCLUDE_DIRS "")
 set(TORCH_LIBRARY_DIRS "")
@@ -73,6 +75,24 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+set(SAGEATTN4_GENERATED_DIR "${CMAKE_CURRENT_LIST_DIR}/generated")
+set(SAGEATTN4_GENERATED_HEADER "${SAGEATTN4_GENERATED_DIR}/sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1.h")
+set(SAGEATTN4_GENERATED_STAMP "${CMAKE_CURRENT_BINARY_DIR}/sageattn4_generated_headers.stamp")
+set(SAGEATTN4_SPECIALIZED_KERNEL_SOURCE "${CMAKE_CURRENT_LIST_DIR}/fwd_kernel.cu")
+add_custom_command(
+  OUTPUT "${SAGEATTN4_GENERATED_STAMP}"
+  BYPRODUCTS "${SAGEATTN4_GENERATED_HEADER}"
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/generate_specialized_headers.py"
+          --output-dir "${SAGEATTN4_GENERATED_DIR}"
+  COMMAND "${CMAKE_COMMAND}" -E touch "${SAGEATTN4_GENERATED_STAMP}"
+  DEPENDS "${CMAKE_CURRENT_LIST_DIR}/generate_specialized_headers.py"
+          "${CMAKE_CURRENT_LIST_DIR}/specialized_codegen.py"
+          "${CMAKE_CURRENT_LIST_DIR}/generated_templates/sageattn4_fwd_specialization.h.in"
+  COMMENT "Generating SageAttention4 Blackwell specialized type headers"
+  VERBATIM
+)
+add_custom_target(sageattn4_generated_headers DEPENDS "${SAGEATTN4_GENERATED_STAMP}")
+
 set(NVIDIA_CUDA_LIBRARY_HEADER_SHIM_DIR "")
 if(NVIDIA_CUDA_PACKAGE_INCLUDE_DIR)
   set(NVIDIA_CUDA_LIBRARY_HEADER_SHIM_DIR "${CMAKE_CURRENT_BINARY_DIR}/nvidia_cuda_library_headers")
@@ -92,7 +112,10 @@ if(NVIDIA_CUDA_PACKAGE_INCLUDE_DIR)
   endforeach()
 endif()
 
-file(GLOB BLACKWELL_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_LIST_DIR}/*.h")
+file(GLOB BLACKWELL_HEADERS CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_LIST_DIR}/*.h"
+  "${CMAKE_CURRENT_LIST_DIR}/generated/*.h"
+)
 file(GLOB QUANTIZATION_HEADERS CONFIGURE_DEPENDS "${SAGEATTN3_DIR}/quantization/*.h")
 
 function(configure_sageattn4_cuda_extension TARGET_NAME)
@@ -109,6 +132,8 @@ function(configure_sageattn4_cuda_extension TARGET_NAME)
     "${CUTLASS_DIR}/include"
     "${CUTLASS_DIR}/tools/util/include"
     ${NVIDIA_CUDA_LIBRARY_HEADER_SHIM_DIR}
+    ${CUDAToolkit_INCLUDE_DIRS}
+    ${SAGEATTN4_CUDA_CCCL_INCLUDE_DIR}
     ${TORCH_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
   )
@@ -145,7 +170,6 @@ function(configure_sageattn4_cuda_extension TARGET_NAME)
     DQINRMEM
     EXECMODE=0
   )
-
   target_compile_options(${TARGET_NAME} PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-O3>
     $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_HALF_OPERATORS__>
@@ -161,12 +185,19 @@ function(configure_sageattn4_cuda_extension TARGET_NAME)
     $<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=${SAGEATTN3_CUDA_ARCH}>
     $<$<COMPILE_LANGUAGE:CUDA>:--threads=4>
   )
+  if(NOT SAGEATTN4_CUDA_FAST_COMPILE STREQUAL "0")
+    target_compile_options(${TARGET_NAME} PRIVATE
+      $<$<COMPILE_LANGUAGE:CUDA>:--Ofast-compile=${SAGEATTN4_CUDA_FAST_COMPILE}>
+    )
+  endif()
 endfunction()
 
 add_library(fp4attn4_cuda MODULE
-  "${CMAKE_CURRENT_LIST_DIR}/api.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/api.cpp"
+  "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE}"
   ${BLACKWELL_HEADERS}
 )
+add_dependencies(fp4attn4_cuda sageattn4_generated_headers)
 configure_sageattn4_cuda_extension(fp4attn4_cuda)
 
 add_library(fp4quant4_cuda MODULE
@@ -174,56 +205,3 @@ add_library(fp4quant4_cuda MODULE
   ${QUANTIZATION_HEADERS}
 )
 configure_sageattn4_cuda_extension(fp4quant4_cuda)
-
-add_executable(mainloop_tma_ws_debug EXCLUDE_FROM_ALL
-  "${CMAKE_CURRENT_LIST_DIR}/mainloop_tma_ws_debug.cu"
-  ${BLACKWELL_HEADERS}
-)
-
-target_include_directories(mainloop_tma_ws_debug PRIVATE
-  "${SAGEATTN3_DIR}"
-  "${SAGEATTN3_DIR}/blackwell"
-  "${CUTLASS_DIR}/include"
-  "${CUTLASS_DIR}/tools/util/include"
-  ${NVIDIA_CUDA_LIBRARY_HEADER_SHIM_DIR}
-)
-
-target_link_libraries(mainloop_tma_ws_debug PRIVATE
-  CUDA::cudart
-  CUDA::cuda_driver
-)
-
-foreach(CUDAToolkit_INCLUDE_DIR IN LISTS CUDAToolkit_INCLUDE_DIRS)
-  target_compile_options(mainloop_tma_ws_debug PRIVATE
-    $<$<COMPILE_LANGUAGE:CUDA>:-I${CUDAToolkit_INCLUDE_DIR}>
-  )
-endforeach()
-
-target_compile_definitions(mainloop_tma_ws_debug PRIVATE
-  CUTLASS_DEBUG_TRACE_LEVEL=0
-  NDEBUG
-  SAGEATTN4_DEBUG_HEADDIM=${SAGEATTN4_DEBUG_HEADDIM}
-  SAGEATTN4_DEBUG_BLOCK_M=${SAGEATTN4_DEBUG_BLOCK_M}
-  SAGEATTN4_DEBUG_BLOCK_N=${SAGEATTN4_DEBUG_BLOCK_N}
-  SAGEATTN4_DEBUG_STAGES=${SAGEATTN4_DEBUG_STAGES}
-  SAGEATTN4_DEBUG_CLUSTER_M=${SAGEATTN4_DEBUG_CLUSTER_M}
-  SAGEATTN4_DEBUG_BLOCK_MEAN=${SAGEATTN4_DEBUG_BLOCK_MEAN}
-  SAGEATTN4_DEBUG_IS_CAUSAL=${SAGEATTN4_DEBUG_IS_CAUSAL}
-  SAGEATTN4_DEBUG_THREAD_IDX=${SAGEATTN4_DEBUG_THREAD_IDX}
-)
-
-target_compile_options(mainloop_tma_ws_debug PRIVATE
-  $<$<COMPILE_LANGUAGE:CUDA>:-O0>
-  $<$<COMPILE_LANGUAGE:CUDA>:-g>
-  $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_HALF_OPERATORS__>
-  $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_HALF_CONVERSIONS__>
-  $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_BFLOAT16_OPERATORS__>
-  $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_BFLOAT16_CONVERSIONS__>
-  $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_BFLOAT162_OPERATORS__>
-  $<$<COMPILE_LANGUAGE:CUDA>:-U__CUDA_NO_BFLOAT162_CONVERSIONS__>
-  $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
-  $<$<COMPILE_LANGUAGE:CUDA>:--expt-extended-lambda>
-  $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>
-  $<$<COMPILE_LANGUAGE:CUDA>:-gencode=arch=${SAGEATTN3_CUDA_ARCH}>
-  $<$<COMPILE_LANGUAGE:CUDA>:--threads=4>
-)

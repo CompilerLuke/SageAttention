@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#pragma once
 
 #include <cutlass/cutlass.h>
 #include <cutlass/array.h>
@@ -27,46 +26,29 @@
 #include "cutlass/gemm/collective/collective_builder.hpp"
 
 #include "utils.h"
+#include "fwd_config.h"
+#include SAGEATTN4_FWD_SPECIALIZATION_HEADER
 #include "named_barrier.h"
-namespace flash {
+namespace flash::generated::SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE {
 
 using namespace cute;
 
-template <typename Ktraits, bool Is_causal>
-struct CollectiveMainloopFwd {
+struct Mainloop {
+    static constexpr bool Is_causal = kIsCausal;
 
-    using Element = typename Ktraits::Element;
-    using ElementSF = typename Ktraits::ElementSF;
     // using TMAElement = Element;
-    // using TMAElementSF = typename Ktraits::ElementSF;
-    using TileShape_MNK = typename Ktraits::TileShape_MNK;
-    using ClusterShape = typename Ktraits::ClusterShape_MNK;
+    // using TMAElementSF = ElementSF;
+    using ClusterShape = ClusterShape_MNK;
 
-    static constexpr int kStages = Ktraits::kStages;
-    static constexpr int kHeadDim = Ktraits::kHeadDim;
-    static constexpr int BlockMean = Ktraits::BlockMean;
-    using GmemTiledCopy = typename Ktraits::GmemTiledCopy;
-    using SmemLayoutQ = typename Ktraits::SmemLayoutQ;
-    using SmemLayoutK = typename Ktraits::SmemLayoutK;
-    using SmemLayoutV = typename Ktraits::SmemLayoutV;
-    using SmemLayoutVt = typename Ktraits::SmemLayoutVt;
-    using SmemLayoutDS = typename Ktraits::SmemLayoutDS;
-    using SmemLayoutAtomDS = typename Ktraits::SmemLayoutAtomDS;
-    using LayoutDS = decltype(
-        blocked_product(
-            SmemLayoutAtomDS{}, 
-            make_layout(
-            make_shape(int32_t(0), int32_t(0), int32_t(0), int32_t(0)),
-            make_stride(int32_t(0), _1{}, int32_t(0), int32_t(0)))
-        )
-        );
+    static constexpr int BlockMean = kBlockMean;
+
     using ShapeQKV = cute::Shape<int32_t, int32_t, int32_t, int32_t>;  // (seqlen, d, head, batch)
     using StrideQKV = cute::Stride<int64_t, _1, int64_t, int64_t>;
     using ShapeSF = cute::Shape<int32_t, int32_t, int32_t, int32_t>;  // (seqlen, d // 16, head, batch)
-    using LayoutSF = typename Ktraits::LayoutSF;
-    using LayoutP = typename Ktraits::LayoutP;
-    using LayoutSFP = typename Ktraits::LayoutSFP;
-    using SfAtom = typename Ktraits::SfAtom;
+
+    using ShapeLambda = Shape<int32_t, int32_t, int32_t>; // (seqlen, head, batch)
+    using StrideLambda = Stride<int64_t, int64_t, int64_t>;
+
     using TMA_Q = decltype(make_tma_copy(
         GmemTiledCopy{},
         make_tensor(make_gmem_ptr(static_cast<Element const*>(nullptr)), repeat_like(StrideQKV{}, int32_t(0)), StrideQKV{}),
@@ -94,13 +76,7 @@ struct CollectiveMainloopFwd {
         take<0, 2>(SmemLayoutDS{}),
         make_shape(shape<0>(TileShape_MNK{}), shape<1>(TileShape_MNK{})),
         _1{}));
-    
-    using BlkScaledConfig = typename Ktraits::BlkScaledConfig;
-    using GmemTiledCopySF = typename Ktraits::GmemTiledCopySF;
-    using SmemLayoutSFQ = typename Ktraits::SmemLayoutSFQ;
-    using SmemLayoutSFK = typename Ktraits::SmemLayoutSFK;
-    using SmemLayoutSFV = typename Ktraits::SmemLayoutSFV;
-    using SmemLayoutSFVt = typename Ktraits::SmemLayoutSFVt;
+
 
     using TMA_SFQ = decltype(make_tma_copy<uint16_t>(
         GmemTiledCopySF{},
@@ -117,6 +93,15 @@ struct CollectiveMainloopFwd {
         make_shape(shape<1>(TileShape_MNK{}), shape<2>(TileShape_MNK{})),
         _1{}));
 
+    /*
+    using TMA_LambK = decltype(make_tma_copy(
+        GmemTiledCopy{},
+        make_tensor(static_cast<ElementSF const*>(nullptr), LayoutLambdaKV{}),
+        SmemLayoutLambdaK{}(_,_,cute::Int<0>{}),
+        make_shape(shape<1>(TileShape_MNK{})),
+        _1{}
+    ));*/
+
     using TMA_SFVt = decltype(make_tma_copy<uint16_t>(
         GmemTiledCopySF{},
         make_tensor(static_cast<ElementSF const*>(nullptr), LayoutSF{}),
@@ -124,19 +109,9 @@ struct CollectiveMainloopFwd {
         make_shape(shape<2>(TileShape_MNK{}), shape<1>(TileShape_MNK{})),
         _1{}));
 
-    using SmemCopyAtomQ = typename Ktraits::SmemCopyAtomQ;
-    using SmemCopyAtomKV = typename Ktraits::SmemCopyAtomKV;
-    using SmemCopyAtomSF = typename Ktraits::SmemCopyAtomSF;
-    using TiledMmaQK = typename Ktraits::TiledMmaQK;
-    using TiledMmaPV = typename Ktraits::TiledMmaPV;
     static constexpr int NumMmaThreads = size(TiledMmaQK{});
-    using MainloopPipeline = typename Ktraits::MainloopPipeline;
     using PipelineParams = typename MainloopPipeline::Params;
     using PipelineState = typename MainloopPipeline::PipelineState;
-    using MainloopPipelineQ = typename Ktraits::MainloopPipelineQ;
-    using PipelineParamsQ = typename Ktraits::PipelineParamsQ;
-    using PipelineStateQ = typename Ktraits::PipelineStateQ;
-    using EpilogueBarrier = typename Ktraits::EpilogueBarrier;
 
     // Set the bytes transferred in this TMA transaction (may involve multiple issues)
     static constexpr uint32_t TmaTransactionBytesQ = static_cast<uint32_t>(
@@ -146,7 +121,9 @@ struct CollectiveMainloopFwd {
     static constexpr uint32_t TmaTransactionBytesK = static_cast<uint32_t>(
         cutlass::bits_to_bytes(cosize(take<0,2>(SmemLayoutSFK{})) * cute::sizeof_bits_v<ElementSF>) +
         cutlass::bits_to_bytes(cosize(take<0,2>(SmemLayoutDS{})) * cute::sizeof_bits_v<float>) +
-        cutlass::bits_to_bytes(size(take<0,2>(SmemLayoutK{})) * sizeof_bits<Element>::value));
+        cutlass::bits_to_bytes(size(take<0,2>(SmemLayoutK{})) * sizeof_bits<Element>::value))
+        //cutlass::bits_to_bytes(cosize(take<0,2>(SmemLayoutLambdaK{})) * cute::sizeof_bits_v<ElementSF>)
+    ;
     
     static constexpr uint32_t TmaTransactionBytesV = static_cast<uint32_t>(
         cutlass::bits_to_bytes(cosize(take<0,2>(SmemLayoutSFVt{})) * cute::sizeof_bits_v<ElementSF>) +
@@ -245,6 +222,7 @@ struct CollectiveMainloopFwd {
             SmemLayoutSFK{}(_, _, _0{}),
             make_shape(shape<1>(TileShape_MNK{}), shape<2>(TileShape_MNK{})),
             _1{});
+
         LayoutSF layout_sfvt = BlkScaledConfig::tile_atom_to_shape_SFVt(args.shape_SFVt);
         Tensor mSFVt = make_tensor(make_gmem_ptr(args.ptr_SFVt), layout_sfvt);
         TMA_SFVt tma_load_sfvt = make_tma_copy<uint16_t>(
@@ -601,12 +579,16 @@ struct CollectiveMainloopFwd {
         Tensor sSFK = make_tensor(make_smem_ptr(shared_storage.smem_SFK.begin()), SmemLayoutSFK{});
         Tensor sSFVt = make_tensor(make_smem_ptr(shared_storage.smem_SFV.begin()), SmemLayoutSFVt{});
 
+        Tensor sLambK = make_tensor(make_smem_ptr(shared_storage.smem_lamb_K.begin()), SmemLayoutLambdaK{});
+
         Tensor cQ = make_identity_tensor(make_shape(size<0>(sQ), size<1>(sQ)));
         Tensor cKV = make_identity_tensor(make_shape(size<0>(sK), size<1>(sK)));
         TiledMmaQK tiled_mma_qk;
         TiledMmaPV tiled_mma_pv;
         auto thread_mma_qk = tiled_mma_qk.get_thread_slice(thread_idx);
         auto thread_mma_pv = tiled_mma_pv.get_thread_slice(thread_idx);
+
+        // tSrX = thread local view of shared memory pointer X
 
         Tensor tSrQ = thread_mma_qk.partition_fragment_A(sQ);
         Tensor tSrK = thread_mma_qk.partition_fragment_B(sK(_,_,Int<0>{}));
@@ -905,4 +887,3 @@ struct CollectiveMainloopFwd {
 };
 
 } // namespace flash
-

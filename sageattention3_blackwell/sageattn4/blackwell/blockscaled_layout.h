@@ -118,7 +118,7 @@ struct BlockScaledConfig {
   CUTE_HOST_DEVICE
   static constexpr auto
   deduce_smem_layoutSFKV(TiledMma tiled_mma, TileShape_MNK tileshape_mnk) {
-  
+
     using sSFK_shapeK = decltype(prepend(make_shape(Blk_SF{}/Int<MMA_NSF>{}, size<2>(TileShape_MNK{}) / Int<SFVecSize>{} / Blk_SF{}), kBasicBlockShape{}));
     using sSFK_shapeN = decltype(prepend(size<1>(TileShape_MNK{}) / Blk_MN{}, mnBasicBlockShape{}));
     using sSFK_strideN = sSF_strideMN;
@@ -143,6 +143,20 @@ struct BlockScaledConfig {
     using SmemLayoutAtomSFVt = decltype(make_layout(sSFVt_shape{}, sSFVt_stride{}));
     return SmemLayoutAtomSFVt{};
   }
+};
+
+struct LambdaScaleConfig {
+  static constexpr int row_block = 4;
+
+  template<class TiledMma, class TileShape_MNK>
+  CUTE_HOST_DEVICE
+  static constexpr auto deduce_smem_layoutSFKV(TiledMma tiled_mma, TileShape_MNK tileshape_mnk) {
+    auto M = size<1>(tileshape_mnk);
+    return make_layout(
+      make_shape(Int<M / row_block>(), Int<row_block>()),
+      make_stride(Int<row_block>(), _1{})
+    );
+  };
 };
 
 

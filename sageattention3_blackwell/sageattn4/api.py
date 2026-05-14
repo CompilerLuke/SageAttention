@@ -19,8 +19,8 @@ import triton.language as tl
 import torch.nn.functional as F
 from typing import Tuple
 from torch.nn.functional import scaled_dot_product_attention as sdpa
-import fp4attn_cuda
-import fp4quant_cuda
+import fp4attn4_cuda
+import fp4quant4_cuda
 
 
 @triton.jit
@@ -96,7 +96,7 @@ def scale_and_quant_fp4(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     B, H, N, D = x.shape
     packed_fp4 = torch.empty((B, H, N, D // 2), device=x.device, dtype=torch.uint8)
     fp8_scale = torch.empty((B, H, N, D // 16), device=x.device, dtype=torch.float8_e4m3fn)
-    fp4quant_cuda.scaled_fp4_quant(x, packed_fp4, fp8_scale, 1)
+    fp4quant4_cuda.scaled_fp4_quant(x, packed_fp4, fp8_scale, 1)
     return packed_fp4, fp8_scale
 
 def scale_and_quant_fp4_permute(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -104,7 +104,7 @@ def scale_and_quant_fp4_permute(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Te
     B, H, N, D = x.shape
     packed_fp4 = torch.empty((B, H, N, D // 2), device=x.device, dtype=torch.uint8)
     fp8_scale = torch.empty((B, H, N, D // 16), device=x.device, dtype=torch.float8_e4m3fn)
-    fp4quant_cuda.scaled_fp4_quant_permute(x, packed_fp4, fp8_scale, 1)
+    fp4quant4_cuda.scaled_fp4_quant_permute(x, packed_fp4, fp8_scale, 1)
     return packed_fp4, fp8_scale
 
 def scale_and_quant_fp4_transpose(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -112,7 +112,7 @@ def scale_and_quant_fp4_transpose(x: torch.Tensor) -> Tuple[torch.Tensor, torch.
     B, H, N, D = x.shape
     packed_fp4 = torch.empty((B, H, D, N // 2), device=x.device, dtype=torch.uint8)
     fp8_scale = torch.empty((B, H, D, N // 16), device=x.device, dtype=torch.float8_e4m3fn)
-    fp4quant_cuda.scaled_fp4_quant_trans(x, packed_fp4, fp8_scale, 1)
+    fp4quant4_cuda.scaled_fp4_quant_trans(x, packed_fp4, fp8_scale, 1)
     return packed_fp4, fp8_scale
 
 def blockscaled_fp4_attn(qlist: Tuple, 
@@ -125,10 +125,14 @@ def blockscaled_fp4_attn(qlist: Tuple,
                          is_bf16: bool = True
                         ):
     softmax_scale = (qlist[0].shape[-1] * 2) ** (-0.5)
-    return fp4attn_cuda.fwd(qlist[0], klist[0], vlist[0], qlist[1], klist[1], vlist[1], delta_s, KL, None, softmax_scale, is_causal, per_block_mean, is_bf16)
+    return fp4attn4_cuda.fwd(qlist[0], klist[0], vlist[0], qlist[1], klist[1], vlist[1], delta_s, KL, None, softmax_scale, is_causal, per_block_mean, is_bf16)
 
 
-def sageattn3_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, **kwargs):
+def last_fwd_used_specialized() -> bool:
+    return fp4attn4_cuda.last_fwd_used_specialized()
+
+
+def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, **kwargs):
     if q.size(-1) >= 256:
         print(f"Unsupported Headdim {q.size(-1)}")
         return sdpa(q, k, v, is_causal = is_causal)

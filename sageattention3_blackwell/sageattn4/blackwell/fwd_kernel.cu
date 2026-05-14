@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
-#pragma once
+
+#include <ATen/cuda/CUDAContext.h>
+#include <c10/cuda/CUDAException.h>
 
 #include "cute/tensor.hpp"
 
 #include <cutlass/cutlass.h>
 #include <cutlass/arch/reg_reconfig.h>
+#include <cutlass/cluster_launch.hpp>
 #include <cutlass/array.h>
 #include <cutlass/numeric_types.h>
 #include <cutlass/numeric_conversion.h>
@@ -27,44 +30,38 @@
 
 #include "params.h"
 #include "utils.h"
+#include "fwd_config.h"
+#include SAGEATTN4_FWD_SPECIALIZATION_HEADER
 #include "tile_scheduler.h"
-#include "mainloop_tma_ws.h"
-#include "epilogue_tma_ws.h"
+#include "fwd_mainloop.cu"
+#include "fwd_epilogue.cu"
 #include "named_barrier.h"
 #include "softmax_fused.h"
 
-namespace flash {
+namespace flash::generated::SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE {
 
 using namespace cute;
 
-template <typename Ktraits, bool Is_causal, typename TileScheduler>
-__global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp, 1)
+template <typename TileScheduler>
+__global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
     compute_attn_ws(CUTE_GRID_CONSTANT Flash_fwd_params const params,
-                    CUTE_GRID_CONSTANT typename CollectiveMainloopFwd<Ktraits, Is_causal>::Params const mainloop_params,
-                    CUTE_GRID_CONSTANT typename CollectiveEpilogueFwd<Ktraits>::Params const epilogue_params,
+                    CUTE_GRID_CONSTANT Mainloop::Params const mainloop_params,
+                    CUTE_GRID_CONSTANT Epilogue::Params const epilogue_params,
                     CUTE_GRID_CONSTANT typename TileScheduler::Params const scheduler_params
                     ) {
 
-    using Element = typename Ktraits::Element;
-    using ElementAccum = typename Ktraits::ElementAccum;
+    using CollectiveMainloop = Mainloop;
+    using CollectiveEpilogue = Epilogue;
+    static constexpr bool Is_causal = kIsCausal;
+
     using SoftType = ElementAccum;
-    using TileShape_MNK = typename Ktraits::TileShape_MNK;
-    using ClusterShape = typename Ktraits::ClusterShape_MNK;
+    using ClusterShape = ClusterShape_MNK;
 
-    static constexpr int NumMmaThreads = size(typename Ktraits::TiledMmaQK{});
+    static constexpr int NumMmaThreads = size(TiledMmaQK{});
     static constexpr int NumCopyThreads = cutlass::NumThreadsPerWarpGroup;
-    static constexpr int kBlockM = Ktraits::kBlockM;
 
-    using CollectiveMainloop = CollectiveMainloopFwd<Ktraits, Is_causal>;
-    using CollectiveEpilogue = CollectiveEpilogueFwd<Ktraits>;
-
-    using MainloopPipeline = typename Ktraits::MainloopPipeline;
     using PipelineParams = typename MainloopPipeline::Params;
     using PipelineState = typename MainloopPipeline::PipelineState;
-    using MainloopPipelineQ = typename Ktraits::MainloopPipelineQ;
-    using PipelineParamsQ = typename Ktraits::PipelineParamsQ;
-    using PipelineStateQ = typename Ktraits::PipelineStateQ;
-    using EpilogueBarrier = typename Ktraits::EpilogueBarrier;
 
 
     enum class WarpGroupRole {
@@ -80,7 +77,7 @@ __global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp,
     };
 
     extern __shared__ char shared_memory[];
-    auto &shared_storage = *reinterpret_cast<typename Ktraits::SharedStorage*>(shared_memory);
+    auto &shared_storage = *reinterpret_cast<SharedStorage*>(shared_memory);
 
     int const lane_predicate = cute::elect_one_sync();
     int const warp_idx = cutlass::canonical_warp_idx_sync();
@@ -167,7 +164,7 @@ __global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp,
         }
     } else if (warp_group_role == WarpGroupRole::Consumer0 || warp_group_role == WarpGroupRole::Consumer1) {
         cutlass::arch::warpgroup_reg_alloc<232>();
-        typename Ktraits::TiledMmaPV tiled_mma_pv;
+        TiledMmaPV tiled_mma_pv;
         TileScheduler scheduler{};
         PipelineState smem_pipe_read_k, smem_pipe_read_v;
         PipelineStateQ smem_pipe_read_q;
@@ -199,4 +196,60 @@ __global__ void __launch_bounds__(Ktraits::kNWarps * cutlass::NumThreadsPerWarp,
     }
 }
 
-} // namespace flash
+void SAGEATTN4_FWD_RUN(Flash_fwd_params &params, cudaStream_t stream) {
+    using Scheduler = flash::StaticPersistentTileScheduler;
+    Mainloop::Params mainloop_params =
+        Mainloop::to_underlying_arguments({
+            static_cast<Element const*>(params.q_ptr),
+            {params.seqlen_q, params.d, params.h, params.b},
+            {params.q_row_stride, _1{}, params.q_head_stride, params.q_batch_stride},
+            static_cast<Element const*>(params.k_ptr),
+            {params.seqlen_k, params.d, params.h_k, params.b},
+            {params.k_row_stride, _1{}, params.k_head_stride, params.k_batch_stride},
+            {params.unpadded_seqlen_k, params.d, params.h_k, params.b},
+            static_cast<Element const*>(params.v_ptr),
+            {params.d, params.seqlen_k, params.h_k, params.b},
+            {params.v_row_stride, _1{}, params.v_head_stride, params.v_batch_stride},
+            static_cast<ElementSF const*>(params.sfq_ptr),
+            {params.seqlen_q, params.d, params.h, params.b},
+            static_cast<ElementSF const*>(params.sfk_ptr),
+            {params.seqlen_k, params.d, params.h_k, params.b},
+            static_cast<ElementSF const*>(params.sfv_ptr),
+            {params.d, params.seqlen_k, params.h_k, params.b},
+            static_cast<float const*>(params.delta_s_ptr),
+            {params.seqlen_s, params.seqlen_k, params.h_k, params.b},
+            {params.ds_row_stride, _1{}, params.ds_head_stride, params.ds_batch_stride},
+            params.scale_softmax_log2
+        });
+    Epilogue::Params epilogue_params =
+        Epilogue::to_underlying_arguments({
+            static_cast<ElementOut*>(params.o_ptr),
+            {params.seqlen_q, params.d, params.h, params.b},
+            {params.o_row_stride, _1{}, params.o_head_stride, params.o_batch_stride},
+            static_cast<float*>(params.softmax_lse_ptr),
+            {_1{}, params.seqlen_q, params.h * params.seqlen_q},
+        });
+
+    int num_blocks_m = cutlass::ceil_div(params.seqlen_q, kBlockM);
+    num_blocks_m = cutlass::ceil_div(num_blocks_m, size<0>(ClusterShape_MNK{})) * size<0>(ClusterShape_MNK{});
+    Scheduler::Arguments scheduler_args = {num_blocks_m, params.h, params.b};
+    Scheduler::Params scheduler_params = Scheduler::to_underlying_arguments(scheduler_args);
+
+    void *kernel = reinterpret_cast<void *>(compute_attn_ws<Scheduler>);
+    int smem_size = sizeof(SharedStorage);
+    if (smem_size >= 48 * 1024) {
+       C10_CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+    }
+    static constexpr int ctaSize = kNWarps * 32;
+    params.m_block_divmod = cutlass::FastDivmod(num_blocks_m);
+    params.total_blocks = num_blocks_m * params.h * params.b;
+    dim3 grid_dims = Scheduler::get_grid_dim(scheduler_args, 170);
+    dim3 block_dims(ctaSize);
+    dim3 cluster_dims(size<0>(ClusterShape_MNK{}), size<1>(ClusterShape_MNK{}), size<2>(ClusterShape_MNK{}));
+    cutlass::ClusterLaunchParams launch_params{grid_dims, block_dims, cluster_dims, smem_size, stream};
+    cutlass::launch_kernel_on_cluster(launch_params, kernel, params, mainloop_params, epilogue_params, scheduler_params);
+
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+}
+
+} // namespace flash::generated::SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE

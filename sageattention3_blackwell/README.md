@@ -37,8 +37,8 @@ python setup.py install
 
 ## How to Use
 ```python
-from sageattn3 import sageattn3_blackwell
-attn_output = sageattn3_blackwell(q, k, v, is_causal=False)
+from sageattn4 import sageattn4_blackwell
+attn_output = sageattn4_blackwell(q, k, v, is_causal=False)
 ```
 + `q, k, v` are **FP16/BF16** dtype with the shape `(batch_size, head_num, seq_len, head_dim)` 
 + `is_causal` determines the use of a causal mask.

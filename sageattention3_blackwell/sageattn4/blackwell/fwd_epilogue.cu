@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#pragma once
 
 #include <cutlass/cutlass.h>
 #include "cute/tensor.hpp"
@@ -22,20 +21,17 @@
 #include "cutlass/gemm/collective/collective_builder.hpp"
 #include "named_barrier.h"
 #include "utils.h"
+#include "fwd_config.h"
+#include SAGEATTN4_FWD_SPECIALIZATION_HEADER
 
-namespace flash {
+namespace flash::generated::SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE {
 
 using namespace cute;
 
-template <typename Ktraits>
-struct CollectiveEpilogueFwd{
+struct Epilogue {
 
-    using Element = typename Ktraits::ElementOut;
-    static constexpr int kBlockM = Ktraits::kBlockM;
-    static constexpr int kBlockN = Ktraits::kBlockN;
-    static constexpr int kHeadDim = Ktraits::kHeadDim;
+    using Element = ElementOut;
     using TileShape_MNK = Shape<Int<kBlockM>, Int<kBlockN>, Int<kHeadDim>>;
-    static constexpr int kNWarps = Ktraits::kNWarps;
     static constexpr int kNThreads = kNWarps * cutlass::NumThreadsPerWarp;
     static constexpr int NumMmaThreads = kNThreads - cutlass::NumThreadsPerWarpGroup;
 
@@ -53,7 +49,6 @@ struct CollectiveEpilogueFwd{
                         GmemLayoutAtom{},
                         Layout<Shape<_1, Int<kGmemElemsPerLoad>>>{}));  // Val layout, 8 or 16 vals per store
 
-    using SmemLayoutO = typename Ktraits::SmemLayoutO;
 
     using SmemCopyAtomO = Copy_Atom<SM90_U32x2_STSM_N, Element>;
     using SharedStorage = cute::array_aligned<Element, cute::cosize_v<SmemLayoutO>>;

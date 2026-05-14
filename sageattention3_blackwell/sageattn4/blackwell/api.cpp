@@ -16,19 +16,35 @@
 
 // Include these 2 headers instead of torch/extension.h since we don't need all of the torch headers.
 #include <torch/python.h>
-#include <torch/nn/functional.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 
+#include <atomic>
 #include <cutlass/numeric_types.h>
 
 #include "params.h"
-#include "launch.h"
+#include "fwd_config.h"
 #include "static_switch.h"
 
 #define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+
+namespace flash {
+
+namespace {
+std::atomic<bool> g_last_fwd_used_specialized{false};
+}  // namespace
+
+void set_last_fwd_used_specialized(bool used) {
+    g_last_fwd_used_specialized.store(used, std::memory_order_relaxed);
+}
+
+bool last_fwd_used_specialized() {
+    return g_last_fwd_used_specialized.load(std::memory_order_relaxed);
+}
+
+}  // namespace flash
 
 
 void set_params_fprop(Flash_fwd_params &params,
@@ -184,20 +200,26 @@ void set_params_fprop(Flash_fwd_params &params,
     #endif
 }
 
-template<bool IsBF16>
-void run_mha_fwd_dispatch_dtype(Flash_fwd_params &params, cudaStream_t stream) {
-    using OType = std::conditional_t<IsBF16, cutlass::bfloat16_t, cutlass::half_t>;
-    if (params.d == 64) {
-        run_mha_fwd_<cutlass::nv_float4_t<cutlass::float_e2m1_t>, 64, OType>(params, stream);
-    } else if (params.d == 128) {
-        run_mha_fwd_<cutlass::nv_float4_t<cutlass::float_e2m1_t>, 128, OType>(params, stream);
-    }
-}
-
 void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream, bool force_split_kernel = false) {
-    BOOL_SWITCH(params.is_bf16, IsBF16, ([&] {
-        run_mha_fwd_dispatch_dtype<IsBF16>(params, stream);
-    }));
+    flash::set_last_fwd_used_specialized(false);
+    namespace Fwd = flash::generated::SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE;
+
+    TORCH_CHECK(
+        params.d == SAGEATTN4_FWD_HEAD_DIM &&
+        params.per_block_mean == SAGEATTN4_FWD_BLOCK_MEAN &&
+        params.is_causal == SAGEATTN4_FWD_IS_CAUSAL &&
+        params.is_bf16,
+        "SageAttention4 Blackwell has no generated specialized forward kernel for this config. ",
+        "Only head_dim=128, block_m=128, block_n=128, stages=3, block_mean=true, ",
+        "is_causal=false, input=nv_float4<float_e2m1>, output=bfloat16 is currently generated. ",
+        "Requested head_dim=", params.d,
+        ", per_block_mean=", params.per_block_mean,
+        ", is_causal=", params.is_causal,
+        ", output_bf16=", params.is_bf16
+    );
+
+    flash::set_last_fwd_used_specialized(true);
+    Fwd::SAGEATTN4_FWD_RUN(params, stream);
 }
 
 std::vector<at::Tensor>
@@ -286,6 +308,8 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     auto softmax_lse = torch::empty({batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
     at::Tensor p;
 
+    std::cout << "Launching mha fwd2:" << "B=" << batch_size << ", seqlen=" << seqlen_q << "per_block_mean=" << per_block_mean << std::endl;
+
     Flash_fwd_params params;
     set_params_fprop(params,
                      batch_size,
@@ -338,4 +362,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "FlashAttention";
     m.def("fwd", &mha_fwd, "Forward pass");
+    m.def("last_fwd_used_specialized", []() {
+        return flash::last_fwd_used_specialized();
+    }, "Whether the most recent forward dispatch used a generated specialized kernel");
 }

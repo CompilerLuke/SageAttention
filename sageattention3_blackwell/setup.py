@@ -1,5 +1,6 @@
 import warnings
 import os
+import sys
 from pathlib import Path
 from packaging.version import parse, Version
 from setuptools import setup, find_packages
@@ -10,8 +11,9 @@ import torch
 from torch.utils.cpp_extension import BuildExtension, CppExtension, CUDAExtension, CUDA_HOME
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
+repo_dir = Path(this_dir)
 
-PACKAGE_NAME = "sageattn3"
+PACKAGE_NAME = "sageattn4"
 
 # FORCE_BUILD: Force a fresh build locally, instead of attempting to find prebuilt wheels
 # SKIP_CUDA_BUILD: Intended to allow CI to use a simple `python setup.py sdist` run to copy over raw files, without any cuda compilation
@@ -19,6 +21,8 @@ FORCE_BUILD = os.getenv("FAHOPPER_FORCE_BUILD", "FALSE") == "TRUE"
 SKIP_CUDA_BUILD = os.getenv("FAHOPPER_SKIP_CUDA_BUILD", "FALSE") == "TRUE"
 # For CI, we want the option to build with C++11 ABI since the nvcr images use C++11 ABI
 FORCE_CXX11_ABI = os.getenv("FAHOPPER_FORCE_CXX11_ABI", "FALSE") == "TRUE"
+CHECK_GENERATED_TYPES = os.getenv("SAGEATTN4_CHECK_GENERATED_TYPES", "FALSE") == "TRUE"
+NVCC_FAST_COMPILE = os.getenv("SAGEATTN4_NVCC_FAST_COMPILE", "")
 
 
 
@@ -45,6 +49,11 @@ def check_if_cuda_home_none(global_option: str) -> None:
 
 def append_nvcc_threads(nvcc_extra_args):
     return nvcc_extra_args + ["--threads", "4"]
+
+
+def generate_blackwell_specialized_headers():
+    script = repo_dir / "sageattn4" / "blackwell" / "generate_specialized_headers.py"
+    subprocess.run([sys.executable, str(script)], check=True)
 
 
 cmdclass = {}
@@ -77,7 +86,7 @@ if not SKIP_CUDA_BUILD:
     # https://github.com/pytorch/pytorch/blob/8472c24e3b5b60150096486616d98b7bea01500b/torch/utils/cpp_extension.py#L920
     if FORCE_CXX11_ABI:
         torch._C._GLIBCXX_USE_CXX11_ABI = True
-    repo_dir = Path(this_dir)
+    generate_blackwell_specialized_headers()
     cutlass_dir = repo_dir / "csrc" / "cutlass"
     (repo_dir / "csrc").mkdir(parents=True, exist_ok=True)
     if not cutlass_dir.exists():
@@ -108,16 +117,31 @@ if not SKIP_CUDA_BUILD:
         "-DCTA256",
         "-DDQINRMEM",
     ]
+    if CHECK_GENERATED_TYPES:
+        nvcc_flags.append("-DSAGEATTN4_CHECK_GENERATED_TYPES=1")
+    if NVCC_FAST_COMPILE:
+        nvcc_flags.append(f"--Ofast-compile={NVCC_FAST_COMPILE}")
+    cccl_candidates = [
+        Path(CUDA_HOME) / "targets" / "x86_64-linux" / "include" / "cccl",
+        Path(CUDA_HOME) / "include" / "cccl",
+        *sorted(Path("/usr/local").glob("cuda-*/targets/x86_64-linux/include/cccl")),
+    ]
+    cccl_include_dirs = [path for path in cccl_candidates if (path / "cuda" / "std" / "utility").exists()]
     include_dirs = [
-        repo_dir / "sageattn3",
+        repo_dir / "sageattn4",
+        Path(CUDA_HOME) / "include",
+        *cccl_include_dirs[:1],
         cutlass_dir / "include",
         cutlass_dir / "tools" / "util" / "include",
     ]
 
     ext_modules.append(
         CUDAExtension(
-            name="fp4attn_cuda",
-            sources=["sageattn3/blackwell/api.cu"],
+            name="fp4attn4_cuda",
+            sources=[
+                "sageattn4/blackwell/api.cpp",
+                "sageattn4/blackwell/fwd_kernel.cu",
+            ],
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],
                 "nvcc": append_nvcc_threads(
@@ -131,8 +155,8 @@ if not SKIP_CUDA_BUILD:
     )
     ext_modules.append(
         CUDAExtension(
-            name="fp4quant_cuda",
-            sources=["sageattn3/quantization/fp4_quantization_4d.cu"],
+            name="fp4quant4_cuda",
+            sources=["sageattn4/quantization/fp4_quantization_4d.cu"],
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],
                 "nvcc": append_nvcc_threads(
