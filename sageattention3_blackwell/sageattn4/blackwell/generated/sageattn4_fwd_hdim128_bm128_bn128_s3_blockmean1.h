@@ -26,7 +26,6 @@ struct Copy_Atom;
 #include <cutlass/gemm/collective/collective_builder.hpp>
 #include <cutlass/pipeline/pipeline.hpp>
 
-#include "blockscaled_layout.h"
 #include "cute_extension.h"
 #include "params.h"
 #include "shared_storage.h"
@@ -96,9 +95,8 @@ using SmemCopyAtomKV = Copy_Atom<SM75_U32x4_LDSM_N, cutlass::float_e2m1_t>;
 using SmemCopyAtomSF = Copy_Atom<UniversalCopy<cutlass::float_ue4m3_t>, cutlass::float_ue4m3_t>;
 using SmemCopyAtomLamb = Copy_Atom<UniversalCopy<cutlass::float_ue4m3_t>, cutlass::float_ue4m3_t>;
 using SmemCopyAtomDS = Copy_Atom<UniversalCopy<float>, float>;
-using BlkScaledConfig = flash::BlockScaledConfig<kSFVectorSize>;
-using LayoutSF = BlkScaledConfig::LayoutSF;
 using SfAtom = decltype(make_layout(make_shape(make_shape(Int<16>{}, Int<4>{}), make_shape(Int<16>{}, Int<4>{})), make_stride(make_stride(Int<16>{}, Int<4>{}), make_stride(Int<0>{}, Int<1>{}))));
+using LayoutSF = decltype(make_layout(make_shape(make_shape(make_shape(Int<16>{}, Int<4>{}), int32_t{}), make_shape(make_shape(Int<16>{}, Int<4>{}), int32_t{}), make_shape(Int<1>{}, int32_t{}), make_shape(Int<1>{}, int32_t{})), make_stride(make_stride(make_stride(Int<16>{}, Int<4>{}), int32_t{}), make_stride(make_stride(Int<0>{}, Int<1>{}), Int<256>{}), make_stride(Int<0>{}, int32_t{}), make_stride(Int<0>{}, int32_t{}))));
 using SmemLayoutAtomSFQ = decltype(make_layout(make_shape(make_shape(make_shape(Int<16>{}, Int<4>{}), Int<2>{}), make_shape(make_shape(Int<16>{}, Int<4>{}), Int<1>{}, Int<2>{})), make_stride(make_stride(make_stride(Int<16>{}, Int<4>{}), Int<256>{}), make_stride(make_stride(Int<0>{}, Int<1>{}), Int<4>{}, Int<512>{}))));
 using SmemLayoutAtomSFK = decltype(make_layout(make_shape(make_shape(make_shape(Int<16>{}, Int<4>{}), Int<2>{}), make_shape(make_shape(Int<16>{}, Int<4>{}), Int<1>{}, Int<2>{})), make_stride(make_stride(make_stride(Int<16>{}, Int<4>{}), Int<256>{}), make_stride(make_stride(Int<0>{}, Int<1>{}), Int<4>{}, Int<512>{}))));
 using SmemLayoutAtomLambK = decltype(make_layout(make_shape(Int<32>{}, Int<4>{}), make_stride(Int<4>{}, Int<1>{})));
@@ -122,6 +120,20 @@ using MainloopPipelineQ = cutlass::PipelineTmaAsync<1>;
 using PipelineParamsQ = MainloopPipelineQ::Params;
 using PipelineStateQ = cutlass::PipelineState<1>;
 using EpilogueBarrier = flash::OrderedSequenceBarrierVarGroupSize<kEpiStages, 2>;
+
+template <class ProblemShape>
+CUTE_HOST_DEVICE constexpr auto
+tile_atom_to_shape_SFQKV(ProblemShape problem_shape) {
+  auto [Seqlen, Dim, HeadNum, Batch] = problem_shape;
+  return tile_to_shape(SfAtom{}, make_shape(Seqlen, Dim, HeadNum, Batch), Step<_2,_1,_3,_4>{});
+}
+
+template <class ProblemShape>
+CUTE_HOST_DEVICE constexpr auto
+tile_atom_to_shape_SFVt(ProblemShape problem_shape) {
+  auto [Dim, Seqlen, HeadNum, Batch] = problem_shape;
+  return tile_to_shape(SfAtom{}, make_shape(Dim, Seqlen, HeadNum, Batch), Step<_2,_1,_3,_4>{});
+}
 
 static constexpr int kMmaNSF = size<2>(typename TiledMmaQK::AtomShape_MNK{}) / kSFVectorSize;
 

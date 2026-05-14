@@ -26,7 +26,6 @@ struct Copy_Atom;
 #include <cutlass/gemm/collective/collective_builder.hpp>
 #include <cutlass/pipeline/pipeline.hpp>
 
-#include "blockscaled_layout.h"
 #include "cute_extension.h"
 #include "params.h"
 #include "shared_storage.h"
@@ -50,6 +49,20 @@ static constexpr int kNumSFPV = kBlockN / 16;
 static constexpr int kSFVectorSize = 16;
 
 $type_aliases
+
+template <class ProblemShape>
+CUTE_HOST_DEVICE constexpr auto
+tile_atom_to_shape_SFQKV(ProblemShape problem_shape) {
+  auto [Seqlen, Dim, HeadNum, Batch] = problem_shape;
+  return tile_to_shape(SfAtom{}, make_shape(Seqlen, Dim, HeadNum, Batch), Step<_2,_1,_3,_4>{});
+}
+
+template <class ProblemShape>
+CUTE_HOST_DEVICE constexpr auto
+tile_atom_to_shape_SFVt(ProblemShape problem_shape) {
+  auto [Dim, Seqlen, HeadNum, Batch] = problem_shape;
+  return tile_to_shape(SfAtom{}, make_shape(Dim, Seqlen, HeadNum, Batch), Step<_2,_1,_3,_4>{});
+}
 
 static constexpr int kMmaNSF = size<2>(typename TiledMmaQK::AtomShape_MNK{}) / kSFVectorSize;
 

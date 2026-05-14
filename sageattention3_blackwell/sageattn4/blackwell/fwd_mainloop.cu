@@ -206,7 +206,7 @@ struct Mainloop {
             SmemLayoutDS{}(_, _, _0{}),
             make_shape(shape<0>(TileShape_MNK{}), shape<1>(TileShape_MNK{})),
             _1{});
-        LayoutSF layout_sfq = BlkScaledConfig::tile_atom_to_shape_SFQKV(args.shape_SFQ);
+        LayoutSF layout_sfq = tile_atom_to_shape_SFQKV(args.shape_SFQ);
         Tensor mSFQ = make_tensor(make_gmem_ptr(args.ptr_SFQ), layout_sfq);
         TMA_SFQ tma_load_sfq = make_tma_copy<uint16_t>(
             GmemTiledCopySF{},
@@ -214,7 +214,7 @@ struct Mainloop {
             SmemLayoutSFQ{},
             make_shape(shape<0>(TileShape_MNK{}), shape<2>(TileShape_MNK{})),
             _1{});
-        LayoutSF layout_sfk = BlkScaledConfig::tile_atom_to_shape_SFQKV(args.shape_SFK);
+        LayoutSF layout_sfk = tile_atom_to_shape_SFQKV(args.shape_SFK);
         Tensor mSFK = make_tensor(make_gmem_ptr(args.ptr_SFK), layout_sfk);
         TMA_SFKV tma_load_sfk = make_tma_copy<uint16_t>(
             GmemTiledCopySF{},
@@ -223,7 +223,7 @@ struct Mainloop {
             make_shape(shape<1>(TileShape_MNK{}), shape<2>(TileShape_MNK{})),
             _1{});
 
-        LayoutSF layout_sfvt = BlkScaledConfig::tile_atom_to_shape_SFVt(args.shape_SFVt);
+        LayoutSF layout_sfvt = tile_atom_to_shape_SFVt(args.shape_SFVt);
         Tensor mSFVt = make_tensor(make_gmem_ptr(args.ptr_SFVt), layout_sfvt);
         TMA_SFVt tma_load_sfvt = make_tma_copy<uint16_t>(
             GmemTiledCopySF{},

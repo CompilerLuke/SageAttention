@@ -115,6 +115,7 @@ def build_type_table(spec: FwdSpec) -> dict[str, CppType]:
 
     atom_layout_shape = (spec.atom_layout_m, 1, 1)
     atom_layout_mnk = cute_layout(atom_layout_shape)
+    sf_atom = blockscaled_sf_atom(16)
     sfq_atom = blockscaled_smem_layout_atom(spec.block_m, spec.head_dim)
     sfk_atom = blockscaled_smem_layout_atom(spec.block_n, spec.head_dim)
     sfv_atom = blockscaled_smem_layout_atom(spec.block_n, spec.head_dim)
@@ -191,9 +192,12 @@ def build_type_table(spec: FwdSpec) -> dict[str, CppType]:
     types["SmemCopyAtomLamb"] = smem_copy_atom_lamb
     types["SmemCopyAtomDS"] = smem_copy_atom_ds
 
-    types["BlkScaledConfig"] = template_type("flash::BlockScaledConfig", "kSFVectorSize")
-    types["LayoutSF"] = named("BlkScaledConfig::LayoutSF")
-    types["SfAtom"] = blockscaled_sf_atom(16)
+    types["SfAtom"] = sf_atom
+    types["LayoutSF"] = cute_blocked_product(
+        sf_atom,
+        (dyn, dyn, dyn, dyn),
+        (dyn, 1, dyn, dyn),
+    )
     types["SmemLayoutAtomSFQ"] = sfq_atom
     types["SmemLayoutAtomSFK"] = sfk_atom
     types["SmemLayoutAtomLambK"] = lambda_k_atom

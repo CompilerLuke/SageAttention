@@ -1,6 +1,7 @@
 import warnings
 import os
 import sys
+import sysconfig
 from pathlib import Path
 from packaging.version import parse, Version
 from setuptools import setup, find_packages
@@ -54,6 +55,26 @@ def append_nvcc_threads(nvcc_extra_args):
 def generate_blackwell_specialized_headers():
     script = repo_dir / "sageattn4" / "blackwell" / "generate_specialized_headers.py"
     subprocess.run([sys.executable, str(script)], check=True)
+
+
+def python_nvidia_include_dirs():
+    include_dirs = []
+    roots = {
+        Path(path)
+        for path in (
+            sysconfig.get_paths().get("purelib"),
+            sysconfig.get_paths().get("platlib"),
+        )
+        if path
+    }
+    for root in roots:
+        nvidia_root = root / "nvidia"
+        if not nvidia_root.exists():
+            continue
+        for include_dir in sorted(nvidia_root.glob("*/include")):
+            if any((include_dir / header).exists() for header in ("cusparse.h", "cublas_v2.h", "cusolverDn.h")):
+                include_dirs.append(include_dir)
+    return include_dirs
 
 
 cmdclass = {}
@@ -129,7 +150,10 @@ if not SKIP_CUDA_BUILD:
     cccl_include_dirs = [path for path in cccl_candidates if (path / "cuda" / "std" / "utility").exists()]
     include_dirs = [
         repo_dir / "sageattn4",
+        repo_dir / "sageattn4" / "blackwell",
+        repo_dir / "sageattn4" / "quantization",
         Path(CUDA_HOME) / "include",
+        *python_nvidia_include_dirs(),
         *cccl_include_dirs[:1],
         cutlass_dir / "include",
         cutlass_dir / "tools" / "util" / "include",

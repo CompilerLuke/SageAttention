@@ -1,0 +1,51 @@
+{
+  "meta": {
+    "layer": 0,
+    "model": "EleutherAI/pythia-6.9b",
+    "model_dtype": "bf16",
+    "source": "transformer_lens",
+    "tokens": 512
+  },
+  "metrics": {
+    "new_fp4_vs_old_fp4": {
+      "cos": 0.9976869225502014,
+      "mae": 0.004054506309330463,
+      "max_abs": 0.19921875,
+      "per_head_cos_mean": 0.9967749714851379,
+      "per_head_cos_min": 0.9901833534240723,
+      "rel_l2": 0.0698755756020546
+    },
+    "new_fp4_vs_sdpa": {
+      "cos": 0.9901305437088013,
+      "mae": 0.007567971013486385,
+      "max_abs": 0.5625,
+      "per_head_cos_mean": 0.9894211292266846,
+      "per_head_cos_min": 0.9715402126312256,
+      "rel_l2": 0.14446119964122772
+    },
+    "old_dense_vs_sdpa": {
+      "cos": 1.0000122785568237,
+      "mae": 9.215030877385288e-05,
+      "max_abs": 0.004046320915222168,
+      "per_head_cos_mean": 0.9999986290931702,
+      "per_head_cos_min": 0.9999974966049194,
+      "rel_l2": 0.0018061886075884104
+    },
+    "old_fp4_vs_sdpa": {
+      "cos": 0.9906309247016907,
+      "mae": 0.007746747694909573,
+      "max_abs": 0.53515625,
+      "per_head_cos_mean": 0.9893165826797485,
+      "per_head_cos_min": 0.9690302014350891,
+      "rel_l2": 0.13753703236579895
+    }
+  },
+  "new_api_path": "/workspace/SageAttention/sageattention3_blackwell/sageattn3/api.py",
+  "old_api_path": "/tmp/SageAttention/sageattention3_blackwell/sageattn3/api.py",
+  "shape": [
+    1,
+    8,
+    512,
+    128
+  ]
+}
