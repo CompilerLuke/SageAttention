@@ -26,6 +26,14 @@
 #include "fwd_config.h"
 #include "static_switch.h"
 
+namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0 {
+void sageattn4_hdim128_bm128_bn128_s3_blockmean0_fwd(Flash_fwd_params &params, cudaStream_t stream);
+}  // namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0
+
+namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal {
+void sageattn4_hdim128_bm128_bn128_s3_blockmean0_causal_fwd(Flash_fwd_params &params, cudaStream_t stream);
+}  // namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal
+
 #define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
@@ -52,6 +60,7 @@ void set_params_fprop(Flash_fwd_params &params,
                       const size_t b,
                       const size_t seqlen_q,
                       const size_t seqlen_k,
+                      const size_t unpadded_seqlen_q,
                       const size_t unpadded_seqlen_k,
                       const size_t seqlen_q_rounded,
                       const size_t seqlen_k_rounded,
@@ -151,6 +160,7 @@ void set_params_fprop(Flash_fwd_params &params,
     params.h_h_k_ratio = h / h_k;
     params.seqlen_q = seqlen_q;
     params.seqlen_k = seqlen_k;
+    params.unpadded_seqlen_q = unpadded_seqlen_q;
     params.unpadded_seqlen_k = unpadded_seqlen_k;
     params.seqlen_q_rounded = seqlen_q_rounded;
     params.seqlen_k_rounded = seqlen_k_rounded;
@@ -208,16 +218,14 @@ void set_params_fprop(Flash_fwd_params &params,
 
 void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream, bool force_split_kernel = false) {
     flash::set_last_fwd_used_specialized(false);
-    namespace Fwd = flash::generated::SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE;
 
     TORCH_CHECK(
-        params.d == SAGEATTN4_FWD_HEAD_DIM &&
-        params.per_block_mean == SAGEATTN4_FWD_BLOCK_MEAN &&
-        params.is_causal == SAGEATTN4_FWD_IS_CAUSAL &&
+        params.d == 128 &&
+        !params.per_block_mean &&
         params.is_bf16,
         "SageAttention4 Blackwell has no generated specialized forward kernel for this config. ",
-        "Only head_dim=128, block_m=128, block_n=128, stages=3, block_mean=true, ",
-        "is_causal=false, input=nv_float4<float_e2m1>, output=bfloat16 is currently generated. ",
+        "Only head_dim=128, block_m=128, block_n=128, stages=3, block_mean=false, ",
+        "is_causal=true/false, input=nv_float4<float_e2m1>, output=bfloat16 is currently generated. ",
         "Requested head_dim=", params.d,
         ", per_block_mean=", params.per_block_mean,
         ", is_causal=", params.is_causal,
@@ -225,7 +233,13 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream, bool force_split
     );
 
     flash::set_last_fwd_used_specialized(true);
-    Fwd::SAGEATTN4_FWD_RUN(params, stream);
+    if (params.is_causal) {
+        flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal::
+            sageattn4_hdim128_bm128_bn128_s3_blockmean0_causal_fwd(params, stream);
+    } else {
+        flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0::
+            sageattn4_hdim128_bm128_bn128_s3_blockmean0_fwd(params, stream);
+    }
 }
 
 std::vector<at::Tensor>
@@ -237,6 +251,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
         const at::Tensor &sfv,
         const at::Tensor &delta_s,
         const at::Tensor &lamb_k,
+        int unpadded_q,
         int unpadded_k,
         c10::optional<at::Tensor> &out_,             // batch_size x seqlen_q x num_heads x head_size
         const float softmax_scale,
@@ -324,7 +339,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     Flash_fwd_params params;
     set_params_fprop(params,
                      batch_size,
-                     seqlen_q, seqlen_k, unpadded_k,
+                     seqlen_q, seqlen_k, unpadded_q, unpadded_k,
                      seqlen_q_rounded, seqlen_k_rounded,
                      num_heads, num_heads_k,
                      unpacked_head_size, unpacked_head_size,

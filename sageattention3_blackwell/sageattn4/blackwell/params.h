@@ -101,7 +101,7 @@ struct Flash_fwd_params : public Qkv_params {
     void * __restrict__ softmax_lseaccum_ptr;
 
     // The dimensions.
-    int b, seqlen_q, seqlen_k, seqlen_knew, d, seqlen_q_rounded, seqlen_k_rounded, d_rounded, rotary_dim, unpadded_seqlen_k;
+    int b, seqlen_q, seqlen_k, seqlen_knew, d, seqlen_q_rounded, seqlen_k_rounded, d_rounded, rotary_dim, unpadded_seqlen_q, unpadded_seqlen_k;
     cutlass::FastDivmod head_divmod, m_block_divmod;
     int total_blocks;
     int seqlen_s;

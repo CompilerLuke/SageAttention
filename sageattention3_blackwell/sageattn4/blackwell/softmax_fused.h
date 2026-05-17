@@ -36,7 +36,7 @@ struct SoftmaxFused{
 
     CUTLASS_DEVICE SoftmaxFused(){};
 
-    template<bool FirstTile, bool InfCheck = false, typename TensorAcc, typename TensorMax>
+    template<bool FirstTile, bool InfCheck = false, bool MaskMeanSlot = false, typename TensorAcc, typename TensorMax>
     CUTLASS_DEVICE auto online_softmax_with_quant(
         TensorAcc& acc, 
         TensorMax& AbsMaxP,
@@ -83,7 +83,9 @@ struct SoftmaxFused{
             for (int mi = 0; mi < size<0>(acc_reduction_view); mi++) {
                 CUTLASS_PRAGMA_UNROLL
                 for (int ni = 0; ni < size<1>(acc_reduction_view); ni++) {
-                    row_sum(mi) += acc_reduction_view(mi, ni);
+                    if (!(MaskMeanSlot && ni % 8 == 0)) {
+                        row_sum(mi) += acc_reduction_view(mi, ni);
+                    }
                 }
             }
         }
@@ -119,7 +121,9 @@ struct SoftmaxFused{
                 CUTLASS_PRAGMA_UNROLL
                 for (int ni = 0; ni < size<1>(acc_reduction_view); ni++) {
                     acc_reduction_view(mi, ni) = flash::ptx_exp2(acc_reduction_view(mi, ni) * softmax_scale_log2 - max_scaled);
-                    row_sum(mi) += acc_reduction_view(mi, ni);
+                    if (!(MaskMeanSlot && ni % 8 == 0)) {
+                        row_sum(mi) += acc_reduction_view(mi, ni);
+                    }
                 }
                 CUTLASS_PRAGMA_UNROLL
                 for (int sfi = 0; sfi < size<1>(AbsMaxP); sfi++) {

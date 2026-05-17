@@ -1,0 +1,125 @@
+CLEAR OBSERVATORY REPORT
+
+Summary: The report describes a quiet instrument calibration run at a mountain observatory. Every record uses the same structure so that the facts are easy to follow: time, technician, telescope station, equipment type, storage shelf, calibration bench, rule, measured count, and reserve count. The final question asks for details that appear in the report, not for outside knowledge.
+
+Record 001: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 8 to calibration bench 4. The standing rule was to log the humidity reading before opening the case. The measured count was 311 pieces, and the backup count was 307 pieces.
+
+Record 002: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 15 to calibration bench 7. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 312 pieces, and the backup count was 308 pieces.
+
+Record 003: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 3 to calibration bench 10. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 313 pieces, and the backup count was 309 pieces.
+
+Record 004: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 10 to calibration bench 2. The standing rule was to save the calibration trace before changing filters. The measured count was 314 pieces, and the backup count was 310 pieces.
+
+Record 005: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 17 to calibration bench 5. The standing rule was to tag any scratched connector for optical review. The measured count was 315 pieces, and the backup count was 311 pieces.
+
+Record 006: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 5 to calibration bench 8. The standing rule was to log the humidity reading before opening the case. The measured count was 316 pieces, and the backup count was 312 pieces.
+
+Record 007: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 12 to calibration bench 11. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 317 pieces, and the backup count was 313 pieces.
+
+Record 008: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 19 to calibration bench 3. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 318 pieces, and the backup count was 314 pieces.
+
+Record 009: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 7 to calibration bench 6. The standing rule was to save the calibration trace before changing filters. The measured count was 319 pieces, and the backup count was 315 pieces.
+
+Record 010: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 14 to calibration bench 9. The standing rule was to tag any scratched connector for optical review. The measured count was 320 pieces, and the backup count was 316 pieces.
+
+Record 011: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 2 to calibration bench 1. The standing rule was to log the humidity reading before opening the case. The measured count was 321 pieces, and the backup count was 317 pieces.
+
+Record 012: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 9 to calibration bench 4. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 322 pieces, and the backup count was 318 pieces.
+
+Record 013: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 16 to calibration bench 7. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 323 pieces, and the backup count was 319 pieces.
+
+Record 014: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 4 to calibration bench 10. The standing rule was to save the calibration trace before changing filters. The measured count was 324 pieces, and the backup count was 320 pieces.
+
+Record 015: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 11 to calibration bench 2. The standing rule was to tag any scratched connector for optical review. The measured count was 325 pieces, and the backup count was 321 pieces.
+
+Record 016: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 18 to calibration bench 5. The standing rule was to log the humidity reading before opening the case. The measured count was 326 pieces, and the backup count was 322 pieces.
+
+Record 017: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 6 to calibration bench 8. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 327 pieces, and the backup count was 323 pieces.
+
+Record 018: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 13 to calibration bench 11. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 328 pieces, and the backup count was 324 pieces.
+
+Record 019: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 1 to calibration bench 3. The standing rule was to save the calibration trace before changing filters. The measured count was 329 pieces, and the backup count was 325 pieces.
+
+Record 020: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 8 to calibration bench 6. The standing rule was to tag any scratched connector for optical review. The measured count was 330 pieces, and the backup count was 326 pieces.
+
+Record 021: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 15 to calibration bench 9. The standing rule was to log the humidity reading before opening the case. The measured count was 331 pieces, and the backup count was 327 pieces.
+
+Record 022: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 3 to calibration bench 1. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 332 pieces, and the backup count was 328 pieces.
+
+Record 023: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 10 to calibration bench 4. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 333 pieces, and the backup count was 329 pieces.
+
+Record 024: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 17 to calibration bench 7. The standing rule was to save the calibration trace before changing filters. The measured count was 334 pieces, and the backup count was 330 pieces.
+
+Record 025: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 5 to calibration bench 10. The standing rule was to tag any scratched connector for optical review. The measured count was 335 pieces, and the backup count was 331 pieces.
+
+Record 026: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 12 to calibration bench 2. The standing rule was to log the humidity reading before opening the case. The measured count was 336 pieces, and the backup count was 332 pieces.
+
+Record 027: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 19 to calibration bench 5. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 337 pieces, and the backup count was 333 pieces.
+
+Record 028: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 7 to calibration bench 8. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 338 pieces, and the backup count was 334 pieces.
+
+Record 029: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 14 to calibration bench 11. The standing rule was to save the calibration trace before changing filters. The measured count was 339 pieces, and the backup count was 335 pieces.
+
+Record 030: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 2 to calibration bench 3. The standing rule was to tag any scratched connector for optical review. The measured count was 340 pieces, and the backup count was 336 pieces.
+
+Record 031: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 9 to calibration bench 6. The standing rule was to log the humidity reading before opening the case. The measured count was 341 pieces, and the backup count was 337 pieces.
+
+Record 032: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 16 to calibration bench 9. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 342 pieces, and the backup count was 338 pieces.
+
+Record 033: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 4 to calibration bench 1. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 343 pieces, and the backup count was 339 pieces.
+
+Record 034: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 11 to calibration bench 4. The standing rule was to save the calibration trace before changing filters. The measured count was 344 pieces, and the backup count was 340 pieces.
+
+Record 035: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 18 to calibration bench 7. The standing rule was to tag any scratched connector for optical review. The measured count was 345 pieces, and the backup count was 341 pieces.
+
+Record 036: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 6 to calibration bench 10. The standing rule was to log the humidity reading before opening the case. The measured count was 346 pieces, and the backup count was 342 pieces.
+
+Record 037: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 13 to calibration bench 2. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 347 pieces, and the backup count was 343 pieces.
+
+Record 038: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 1 to calibration bench 5. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 348 pieces, and the backup count was 344 pieces.
+
+Record 039: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 8 to calibration bench 8. The standing rule was to save the calibration trace before changing filters. The measured count was 349 pieces, and the backup count was 345 pieces.
+
+Record 040: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 15 to calibration bench 11. The standing rule was to tag any scratched connector for optical review. The measured count was 350 pieces, and the backup count was 346 pieces.
+
+Record 041: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 3 to calibration bench 3. The standing rule was to log the humidity reading before opening the case. The measured count was 351 pieces, and the backup count was 347 pieces.
+
+Record 042: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 10 to calibration bench 6. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 352 pieces, and the backup count was 348 pieces.
+
+Record 043: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 17 to calibration bench 9. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 353 pieces, and the backup count was 349 pieces.
+
+Record 044: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 5 to calibration bench 1. The standing rule was to save the calibration trace before changing filters. The measured count was 354 pieces, and the backup count was 350 pieces.
+
+Record 045: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 12 to calibration bench 4. The standing rule was to tag any scratched connector for optical review. The measured count was 355 pieces, and the backup count was 351 pieces.
+
+Record 046: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 19 to calibration bench 7. The standing rule was to log the humidity reading before opening the case. The measured count was 356 pieces, and the backup count was 352 pieces.
+
+Record 047: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 7 to calibration bench 10. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 357 pieces, and the backup count was 353 pieces.
+
+Record 048: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 14 to calibration bench 2. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 358 pieces, and the backup count was 354 pieces.
+
+Record 049: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 2 to calibration bench 5. The standing rule was to save the calibration trace before changing filters. The measured count was 359 pieces, and the backup count was 355 pieces.
+
+Record 050: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 9 to calibration bench 8. The standing rule was to tag any scratched connector for optical review. The measured count was 360 pieces, and the backup count was 356 pieces.
+
+Record 051: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 16 to calibration bench 11. The standing rule was to log the humidity reading before opening the case. The measured count was 361 pieces, and the backup count was 357 pieces.
+
+Record 052: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 4 to calibration bench 3. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 362 pieces, and the backup count was 358 pieces.
+
+Record 053: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 11 to calibration bench 6. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 363 pieces, and the backup count was 359 pieces.
+
+Record 054: At 16:50, Selma inspected the Control Annex checkpoint. The team moved black filter wheels from storage shelf 18 to calibration bench 9. The standing rule was to save the calibration trace before changing filters. The measured count was 364 pieces, and the backup count was 360 pieces.
+
+Record 055: At 06:40, Tariq inspected the Weather Deck checkpoint. The team moved wrapped tripod heads from storage shelf 6 to calibration bench 1. The standing rule was to tag any scratched connector for optical review. The measured count was 365 pieces, and the backup count was 361 pieces.
+
+Record 056: At 08:10, Iris inspected the Mirror Lab checkpoint. The team moved silver alignment caps from storage shelf 13 to calibration bench 4. The standing rule was to log the humidity reading before opening the case. The measured count was 366 pieces, and the backup count was 362 pieces.
+
+Record 057: At 10:30, Mateo inspected the North Dome checkpoint. The team moved violet sensor trays from storage shelf 1 to calibration bench 7. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 367 pieces, and the backup count was 363 pieces.
+
+Record 058: At 13:20, Rin inspected the Spectrograph Room checkpoint. The team moved coded fiber bundles from storage shelf 8 to calibration bench 10. The standing rule was to compare serial numbers against the blue worksheet. The measured count was 368 pieces, and the backup count was 364 pieces.
+
+QUESTION SECTION
+Answer using only the report above. Which inspector handled Record 042, which checkpoint did that record mention, and what material was moved? What standing rule applied to Record 042? Also compare the measured count and backup count in Record 042, and state the difference in pieces. Finally, name the time and calibration bench from Record 057.
+
+ANSWER SECTION
+Record 042 was handled by Mateo at the North Dome checkpoint. The moved material was violet sensor trays. The standing rule was to cover exposed lenses whenever the dome door moves. The measured count was 352 pieces, the backup count was 348 pieces, and the difference was 4 pieces. Record 057 used time 10:30 and calibration bench 7.

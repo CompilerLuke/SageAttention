@@ -1,0 +1,125 @@
+CLEAR LOGISTICS REPORT
+
+Summary: The report describes a calm logistics drill for a coastal emergency depot. Every record uses the same structure so that the facts are easy to follow: time, inspector, checkpoint, material, bay, staging lane, rule, measured count, and backup count. The final question asks for details that appear in the report, not for outside knowledge.
+
+Record 001: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 8 to staging lane 4. The standing rule was to photograph the pallet label after unloading. The measured count was 121 units, and the backup count was 119 units.
+
+Record 002: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 15 to staging lane 7. The standing rule was to keep cold-storage items under the white canopy. The measured count was 122 units, and the backup count was 120 units.
+
+Record 003: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 3 to staging lane 10. The standing rule was to send a radio update before the truck leaves. The measured count was 123 units, and the backup count was 121 units.
+
+Record 004: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 10 to staging lane 2. The standing rule was to record damaged seals in the shared notebook. The measured count was 124 units, and the backup count was 122 units.
+
+Record 005: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 17 to staging lane 5. The standing rule was to verify the manifest before loading any crate. The measured count was 125 units, and the backup count was 123 units.
+
+Record 006: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 5 to staging lane 8. The standing rule was to photograph the pallet label after unloading. The measured count was 126 units, and the backup count was 124 units.
+
+Record 007: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 12 to staging lane 11. The standing rule was to keep cold-storage items under the white canopy. The measured count was 127 units, and the backup count was 125 units.
+
+Record 008: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 19 to staging lane 3. The standing rule was to send a radio update before the truck leaves. The measured count was 128 units, and the backup count was 126 units.
+
+Record 009: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 7 to staging lane 6. The standing rule was to record damaged seals in the shared notebook. The measured count was 129 units, and the backup count was 127 units.
+
+Record 010: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 14 to staging lane 9. The standing rule was to verify the manifest before loading any crate. The measured count was 130 units, and the backup count was 128 units.
+
+Record 011: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 2 to staging lane 1. The standing rule was to photograph the pallet label after unloading. The measured count was 131 units, and the backup count was 129 units.
+
+Record 012: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 9 to staging lane 4. The standing rule was to keep cold-storage items under the white canopy. The measured count was 132 units, and the backup count was 130 units.
+
+Record 013: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 16 to staging lane 7. The standing rule was to send a radio update before the truck leaves. The measured count was 133 units, and the backup count was 131 units.
+
+Record 014: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 4 to staging lane 10. The standing rule was to record damaged seals in the shared notebook. The measured count was 134 units, and the backup count was 132 units.
+
+Record 015: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 11 to staging lane 2. The standing rule was to verify the manifest before loading any crate. The measured count was 135 units, and the backup count was 133 units.
+
+Record 016: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 18 to staging lane 5. The standing rule was to photograph the pallet label after unloading. The measured count was 136 units, and the backup count was 134 units.
+
+Record 017: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 6 to staging lane 8. The standing rule was to keep cold-storage items under the white canopy. The measured count was 137 units, and the backup count was 135 units.
+
+Record 018: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 13 to staging lane 11. The standing rule was to send a radio update before the truck leaves. The measured count was 138 units, and the backup count was 136 units.
+
+Record 019: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 1 to staging lane 3. The standing rule was to record damaged seals in the shared notebook. The measured count was 139 units, and the backup count was 137 units.
+
+Record 020: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 8 to staging lane 6. The standing rule was to verify the manifest before loading any crate. The measured count was 140 units, and the backup count was 138 units.
+
+Record 021: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 15 to staging lane 9. The standing rule was to photograph the pallet label after unloading. The measured count was 141 units, and the backup count was 139 units.
+
+Record 022: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 3 to staging lane 1. The standing rule was to keep cold-storage items under the white canopy. The measured count was 142 units, and the backup count was 140 units.
+
+Record 023: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 10 to staging lane 4. The standing rule was to send a radio update before the truck leaves. The measured count was 143 units, and the backup count was 141 units.
+
+Record 024: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 17 to staging lane 7. The standing rule was to record damaged seals in the shared notebook. The measured count was 144 units, and the backup count was 142 units.
+
+Record 025: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 5 to staging lane 10. The standing rule was to verify the manifest before loading any crate. The measured count was 145 units, and the backup count was 143 units.
+
+Record 026: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 12 to staging lane 2. The standing rule was to photograph the pallet label after unloading. The measured count was 146 units, and the backup count was 144 units.
+
+Record 027: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 19 to staging lane 5. The standing rule was to keep cold-storage items under the white canopy. The measured count was 147 units, and the backup count was 145 units.
+
+Record 028: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 7 to staging lane 8. The standing rule was to send a radio update before the truck leaves. The measured count was 148 units, and the backup count was 146 units.
+
+Record 029: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 14 to staging lane 11. The standing rule was to record damaged seals in the shared notebook. The measured count was 149 units, and the backup count was 147 units.
+
+Record 030: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 2 to staging lane 3. The standing rule was to verify the manifest before loading any crate. The measured count was 150 units, and the backup count was 148 units.
+
+Record 031: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 9 to staging lane 6. The standing rule was to photograph the pallet label after unloading. The measured count was 151 units, and the backup count was 149 units.
+
+Record 032: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 16 to staging lane 9. The standing rule was to keep cold-storage items under the white canopy. The measured count was 152 units, and the backup count was 150 units.
+
+Record 033: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 4 to staging lane 1. The standing rule was to send a radio update before the truck leaves. The measured count was 153 units, and the backup count was 151 units.
+
+Record 034: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 11 to staging lane 4. The standing rule was to record damaged seals in the shared notebook. The measured count was 154 units, and the backup count was 152 units.
+
+Record 035: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 18 to staging lane 7. The standing rule was to verify the manifest before loading any crate. The measured count was 155 units, and the backup count was 153 units.
+
+Record 036: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 6 to staging lane 10. The standing rule was to photograph the pallet label after unloading. The measured count was 156 units, and the backup count was 154 units.
+
+Record 037: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 13 to staging lane 2. The standing rule was to keep cold-storage items under the white canopy. The measured count was 157 units, and the backup count was 155 units.
+
+Record 038: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 1 to staging lane 5. The standing rule was to send a radio update before the truck leaves. The measured count was 158 units, and the backup count was 156 units.
+
+Record 039: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 8 to staging lane 8. The standing rule was to record damaged seals in the shared notebook. The measured count was 159 units, and the backup count was 157 units.
+
+Record 040: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 15 to staging lane 11. The standing rule was to verify the manifest before loading any crate. The measured count was 160 units, and the backup count was 158 units.
+
+Record 041: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 3 to staging lane 3. The standing rule was to photograph the pallet label after unloading. The measured count was 161 units, and the backup count was 159 units.
+
+Record 042: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 10 to staging lane 6. The standing rule was to keep cold-storage items under the white canopy. The measured count was 162 units, and the backup count was 160 units.
+
+Record 043: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 17 to staging lane 9. The standing rule was to send a radio update before the truck leaves. The measured count was 163 units, and the backup count was 161 units.
+
+Record 044: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 5 to staging lane 1. The standing rule was to record damaged seals in the shared notebook. The measured count was 164 units, and the backup count was 162 units.
+
+Record 045: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 12 to staging lane 4. The standing rule was to verify the manifest before loading any crate. The measured count was 165 units, and the backup count was 163 units.
+
+Record 046: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 19 to staging lane 7. The standing rule was to photograph the pallet label after unloading. The measured count was 166 units, and the backup count was 164 units.
+
+Record 047: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 7 to staging lane 10. The standing rule was to keep cold-storage items under the white canopy. The measured count was 167 units, and the backup count was 165 units.
+
+Record 048: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 14 to staging lane 2. The standing rule was to send a radio update before the truck leaves. The measured count was 168 units, and the backup count was 166 units.
+
+Record 049: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 2 to staging lane 5. The standing rule was to record damaged seals in the shared notebook. The measured count was 169 units, and the backup count was 167 units.
+
+Record 050: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 9 to staging lane 8. The standing rule was to verify the manifest before loading any crate. The measured count was 170 units, and the backup count was 168 units.
+
+Record 051: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 16 to staging lane 11. The standing rule was to photograph the pallet label after unloading. The measured count was 171 units, and the backup count was 169 units.
+
+Record 052: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 4 to staging lane 3. The standing rule was to keep cold-storage items under the white canopy. The measured count was 172 units, and the backup count was 170 units.
+
+Record 053: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 11 to staging lane 6. The standing rule was to send a radio update before the truck leaves. The measured count was 173 units, and the backup count was 171 units.
+
+Record 054: At 16:50, Nia inspected the South Yard checkpoint. The team moved green radio kits from bay 18 to staging lane 9. The standing rule was to record damaged seals in the shared notebook. The measured count was 174 units, and the backup count was 172 units.
+
+Record 055: At 06:40, Mira inspected the North Pier checkpoint. The team moved sealed water filters from bay 6 to staging lane 1. The standing rule was to verify the manifest before loading any crate. The measured count was 175 units, and the backup count was 173 units.
+
+Record 056: At 08:10, Jon inspected the East Warehouse checkpoint. The team moved labeled battery packs from bay 13 to staging lane 4. The standing rule was to photograph the pallet label after unloading. The measured count was 176 units, and the backup count was 174 units.
+
+Record 057: At 10:30, Leah inspected the River Gate checkpoint. The team moved blue medical crates from bay 1 to staging lane 7. The standing rule was to keep cold-storage items under the white canopy. The measured count was 177 units, and the backup count was 175 units.
+
+Record 058: At 13:20, Omar inspected the Hill Office checkpoint. The team moved folded shelter panels from bay 8 to staging lane 10. The standing rule was to send a radio update before the truck leaves. The measured count was 178 units, and the backup count was 176 units.
+
+QUESTION SECTION
+Answer using only the report above. Which inspector handled Record 042, which checkpoint did that record mention, and what material was moved? What standing rule applied to Record 042? Also compare the measured count and backup count in Record 042, and state the difference in units. Finally, name the time and staging lane from Record 057.
+
+ANSWER SECTION
+Record 042 was handled by Leah at the River Gate checkpoint. The moved material was blue medical crates. The standing rule was to keep cold-storage items under the white canopy. The measured count was 162 units, the backup count was 160 units, and the difference was 2 units. Record 057 used time 10:30 and staging lane 7.

@@ -1,0 +1,125 @@
+CLEAR MOBILE CLINIC REPORT
+
+Summary: The report describes a supervised mobile clinic rehearsal after a regional storm. Every record uses the same structure so that the facts are easy to follow: time, coordinator, clinic station, supply type, cabinet, service desk, rule, checked count, and reserve count. The final question asks for details that appear in the report, not for outside knowledge.
+
+Record 001: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 8 to service desk 4. The standing rule was to initial every temperature label before release. The measured count was 211 items, and the backup count was 208 items.
+
+Record 002: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 15 to service desk 7. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 212 items, and the backup count was 209 items.
+
+Record 003: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 3 to service desk 10. The standing rule was to scan each patient packet before filing it. The measured count was 213 items, and the backup count was 210 items.
+
+Record 004: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 10 to service desk 2. The standing rule was to test every lamp battery before the evening shift. The measured count was 214 items, and the backup count was 211 items.
+
+Record 005: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 17 to service desk 5. The standing rule was to separate torn cartons from clean inventory. The measured count was 215 items, and the backup count was 212 items.
+
+Record 006: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 5 to service desk 8. The standing rule was to initial every temperature label before release. The measured count was 216 items, and the backup count was 213 items.
+
+Record 007: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 12 to service desk 11. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 217 items, and the backup count was 214 items.
+
+Record 008: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 19 to service desk 3. The standing rule was to scan each patient packet before filing it. The measured count was 218 items, and the backup count was 215 items.
+
+Record 009: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 7 to service desk 6. The standing rule was to test every lamp battery before the evening shift. The measured count was 219 items, and the backup count was 216 items.
+
+Record 010: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 14 to service desk 9. The standing rule was to separate torn cartons from clean inventory. The measured count was 220 items, and the backup count was 217 items.
+
+Record 011: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 2 to service desk 1. The standing rule was to initial every temperature label before release. The measured count was 221 items, and the backup count was 218 items.
+
+Record 012: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 9 to service desk 4. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 222 items, and the backup count was 219 items.
+
+Record 013: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 16 to service desk 7. The standing rule was to scan each patient packet before filing it. The measured count was 223 items, and the backup count was 220 items.
+
+Record 014: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 4 to service desk 10. The standing rule was to test every lamp battery before the evening shift. The measured count was 224 items, and the backup count was 221 items.
+
+Record 015: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 11 to service desk 2. The standing rule was to separate torn cartons from clean inventory. The measured count was 225 items, and the backup count was 222 items.
+
+Record 016: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 18 to service desk 5. The standing rule was to initial every temperature label before release. The measured count was 226 items, and the backup count was 223 items.
+
+Record 017: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 6 to service desk 8. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 227 items, and the backup count was 224 items.
+
+Record 018: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 13 to service desk 11. The standing rule was to scan each patient packet before filing it. The measured count was 228 items, and the backup count was 225 items.
+
+Record 019: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 1 to service desk 3. The standing rule was to test every lamp battery before the evening shift. The measured count was 229 items, and the backup count was 226 items.
+
+Record 020: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 8 to service desk 6. The standing rule was to separate torn cartons from clean inventory. The measured count was 230 items, and the backup count was 227 items.
+
+Record 021: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 15 to service desk 9. The standing rule was to initial every temperature label before release. The measured count was 231 items, and the backup count was 228 items.
+
+Record 022: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 3 to service desk 1. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 232 items, and the backup count was 229 items.
+
+Record 023: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 10 to service desk 4. The standing rule was to scan each patient packet before filing it. The measured count was 233 items, and the backup count was 230 items.
+
+Record 024: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 17 to service desk 7. The standing rule was to test every lamp battery before the evening shift. The measured count was 234 items, and the backup count was 231 items.
+
+Record 025: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 5 to service desk 10. The standing rule was to separate torn cartons from clean inventory. The measured count was 235 items, and the backup count was 232 items.
+
+Record 026: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 12 to service desk 2. The standing rule was to initial every temperature label before release. The measured count was 236 items, and the backup count was 233 items.
+
+Record 027: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 19 to service desk 5. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 237 items, and the backup count was 234 items.
+
+Record 028: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 7 to service desk 8. The standing rule was to scan each patient packet before filing it. The measured count was 238 items, and the backup count was 235 items.
+
+Record 029: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 14 to service desk 11. The standing rule was to test every lamp battery before the evening shift. The measured count was 239 items, and the backup count was 236 items.
+
+Record 030: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 2 to service desk 3. The standing rule was to separate torn cartons from clean inventory. The measured count was 240 items, and the backup count was 237 items.
+
+Record 031: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 9 to service desk 6. The standing rule was to initial every temperature label before release. The measured count was 241 items, and the backup count was 238 items.
+
+Record 032: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 16 to service desk 9. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 242 items, and the backup count was 239 items.
+
+Record 033: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 4 to service desk 1. The standing rule was to scan each patient packet before filing it. The measured count was 243 items, and the backup count was 240 items.
+
+Record 034: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 11 to service desk 4. The standing rule was to test every lamp battery before the evening shift. The measured count was 244 items, and the backup count was 241 items.
+
+Record 035: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 18 to service desk 7. The standing rule was to separate torn cartons from clean inventory. The measured count was 245 items, and the backup count was 242 items.
+
+Record 036: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 6 to service desk 10. The standing rule was to initial every temperature label before release. The measured count was 246 items, and the backup count was 243 items.
+
+Record 037: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 13 to service desk 2. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 247 items, and the backup count was 244 items.
+
+Record 038: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 1 to service desk 5. The standing rule was to scan each patient packet before filing it. The measured count was 248 items, and the backup count was 245 items.
+
+Record 039: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 8 to service desk 8. The standing rule was to test every lamp battery before the evening shift. The measured count was 249 items, and the backup count was 246 items.
+
+Record 040: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 15 to service desk 11. The standing rule was to separate torn cartons from clean inventory. The measured count was 250 items, and the backup count was 247 items.
+
+Record 041: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 3 to service desk 3. The standing rule was to initial every temperature label before release. The measured count was 251 items, and the backup count was 248 items.
+
+Record 042: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 10 to service desk 6. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 252 items, and the backup count was 249 items.
+
+Record 043: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 17 to service desk 9. The standing rule was to scan each patient packet before filing it. The measured count was 253 items, and the backup count was 250 items.
+
+Record 044: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 5 to service desk 1. The standing rule was to test every lamp battery before the evening shift. The measured count was 254 items, and the backup count was 251 items.
+
+Record 045: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 12 to service desk 4. The standing rule was to separate torn cartons from clean inventory. The measured count was 255 items, and the backup count was 252 items.
+
+Record 046: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 19 to service desk 7. The standing rule was to initial every temperature label before release. The measured count was 256 items, and the backup count was 253 items.
+
+Record 047: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 7 to service desk 10. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 257 items, and the backup count was 254 items.
+
+Record 048: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 14 to service desk 2. The standing rule was to scan each patient packet before filing it. The measured count was 258 items, and the backup count was 255 items.
+
+Record 049: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 2 to service desk 5. The standing rule was to test every lamp battery before the evening shift. The measured count was 259 items, and the backup count was 256 items.
+
+Record 050: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 9 to service desk 8. The standing rule was to separate torn cartons from clean inventory. The measured count was 260 items, and the backup count was 257 items.
+
+Record 051: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 16 to service desk 11. The standing rule was to initial every temperature label before release. The measured count was 261 items, and the backup count was 258 items.
+
+Record 052: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 4 to service desk 3. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 262 items, and the backup count was 259 items.
+
+Record 053: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 11 to service desk 6. The standing rule was to scan each patient packet before filing it. The measured count was 263 items, and the backup count was 260 items.
+
+Record 054: At 16:50, Dev inspected the Intake Hall checkpoint. The team moved portable lamp cases from cabinet 18 to service desk 9. The standing rule was to test every lamp battery before the evening shift. The measured count was 264 items, and the backup count was 261 items.
+
+Record 055: At 06:40, Elena inspected the Supply Van checkpoint. The team moved sterile glove cartons from cabinet 6 to service desk 1. The standing rule was to separate torn cartons from clean inventory. The measured count was 265 items, and the backup count was 262 items.
+
+Record 056: At 08:10, Asha inspected the Triage Tent checkpoint. The team moved orange wound-care boxes from cabinet 13 to service desk 4. The standing rule was to initial every temperature label before release. The measured count was 266 items, and the backup count was 263 items.
+
+Record 057: At 10:30, Ben inspected the Pharmacy Desk checkpoint. The team moved sealed insulin coolers from cabinet 1 to service desk 7. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 267 items, and the backup count was 264 items.
+
+Record 058: At 13:20, Clara inspected the Vaccine Room checkpoint. The team moved paper intake packets from cabinet 8 to service desk 10. The standing rule was to scan each patient packet before filing it. The measured count was 268 items, and the backup count was 265 items.
+
+QUESTION SECTION
+Answer using only the report above. Which inspector handled Record 042, which checkpoint did that record mention, and what material was moved? What standing rule applied to Record 042? Also compare the measured count and backup count in Record 042, and state the difference in items. Finally, name the time and service desk from Record 057.
+
+ANSWER SECTION
+Record 042 was handled by Ben at the Pharmacy Desk checkpoint. The moved material was sealed insulin coolers. The standing rule was to keep controlled medicine inside the locked cart. The measured count was 252 items, the backup count was 249 items, and the difference was 3 items. Record 057 used time 10:30 and service desk 7.

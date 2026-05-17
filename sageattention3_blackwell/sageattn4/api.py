@@ -82,7 +82,8 @@ def round_to_blockscaled_fp4(x: torch.Tensor) -> torch.Tensor:
     blocks = xf.reshape(*xf.shape[:-1], xf.shape[-1] // 16, 16)
 
     scale = (blocks.abs().amax(dim=-1, keepdim=True) / 6.0).to(torch.float8_e4m3fn).float()
-    scaled = torch.where(scale == 0, torch.zeros_like(blocks), blocks / scale)
+    scale_inv = torch.where(scale == 0, torch.zeros_like(scale), 1.0 / scale)
+    scaled = blocks * scale_inv
     scaled_abs = scaled.abs().clamp(max=6.0)
 
     levels = torch.tensor(
@@ -95,9 +96,18 @@ def round_to_blockscaled_fp4(x: torch.Tensor) -> torch.Tensor:
         device=x.device,
         dtype=torch.float32,
     )
-    rounded_abs = levels[torch.bucketize(scaled_abs, boundaries)]
+    rounded_code = torch.bucketize(scaled_abs, boundaries)
+    # PTX cvt.rn.satfinite.e2m1x2.f32 uses nearest-even at exact midpoints.
+    # With monotonic e2m1 codes this chooses the upper code at these boundaries.
+    tie_round_up = (scaled_abs == 0.75) | (scaled_abs == 1.75) | (scaled_abs == 3.5)
+    rounded_code = torch.where(tie_round_up, rounded_code + 1, rounded_code).clamp(max=7)
+    rounded_abs = levels[rounded_code]
     rounded = rounded_abs.copysign(scaled)
     return (rounded * scale).reshape_as(xf).to(orig_dtype)
+
+def round_to_token_blockscaled_fp4(x: torch.Tensor) -> torch.Tensor:
+    """Round values as the transposed V fp4 path, grouping over tokens."""
+    return round_to_blockscaled_fp4(x.transpose(-1, -2).contiguous()).transpose(-1, -2).contiguous()
 
 def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_mean: bool, quant_block_size: int):
     B,H,_,D = q.shape
@@ -137,22 +147,31 @@ def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_
         x_block = x_block.reshape(B,H,T//Q*(Q+1),D)
         lamb = lamb.reshape(B,H,T//Q*(Q+1))
         return x_block, lamb
-    def quant_pack_v(x):
+    def quant_pack_v(x, split_first):
         Q = quant_block_size-1
         x = pad_to_block(x, Q)
         T = x.size(-2)
         x_block = E.rearrange(x, 'b h (n m) d -> b h n m d', n=T//Q, m=Q)
 
-        x_mean = torch.zeros((B,H,T//Q,D), device=device, dtype=x.dtype)
-        x_res = x_block
-
-        #TODO: SMOOTH V-VALUES AS WELL to avoid padding waste
-        #x_mean = x_block.mean(dim=-2)
-        #x_res = x_block - x_mean.unsqueeze(-2)
+        if not split_first:
+            x_slot = torch.zeros((B,H,T//Q,D), device=device, dtype=x.dtype)
+            x_split = x_block
+        else:
+            x_zero = torch.zeros((B,H,T//Q,D), device=device, dtype=x.dtype)
+            x_base = torch.cat([
+                x_zero.unsqueeze(-2),
+                x_block,
+            ], dim=-2).reshape(B,H,T//Q*(Q+1),D)
+            x_base_rounded = round_to_token_blockscaled_fp4(pad_to_block(x_base, BLOCK_SIZE))[:, :, :x_base.size(2), :]
+            x_base_rounded = x_base_rounded.reshape(B,H,T//Q,Q+1,D)
+            x_hi = x_base_rounded[:, :, :, 1, :].contiguous()
+            x_slot = (x_block[:, :, :, 0, :].float() - x_hi.float()).to(x.dtype)
+            x_split = x_block.clone()
+            x_split[:, :, :, 0, :] = x_hi.to(x.dtype)
 
         x_block = torch.cat([
-            x_mean.unsqueeze(-2),
-            x_res
+            x_slot.unsqueeze(-2),
+            x_split
         ], dim=-2)
         x_block = x_block.reshape(B,H,T//Q*(Q+1),D)
         return x_block
@@ -170,11 +189,13 @@ def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_
         q = q - qm
 
     k, k_lambda = quant_pack_k(k)
-    v = quant_pack_v(v)
+    v = quant_pack_v(v, split_first=not per_block_mean)
 
     k = pad_to_block(k, N=BLOCK_SIZE)
     k_lambda = pad_to_block(k_lambda.unsqueeze(-1), N=BLOCK_SIZE).squeeze(-1)
 
+    # Use unrounded packed K for dS so S3/S4 comparisons only differ in the
+    # packed K representation, not in an extra dS rounding loss.
     delta_s = torch.matmul(qm, k.transpose(-2, -1)).to(torch.float32).contiguous()
 
     v = pad_to_block(v, N=BLOCK_SIZE)
@@ -212,13 +233,14 @@ def blockscaled_fp4_attn(qlist: Tuple,
                          vlist: Tuple,
                          delta_s: torch.Tensor,
                          lambda_k: torch.Tensor,
+                         QL: int,
                          KL: int,
                          is_causal: bool = False, 
                          per_block_mean: bool = True,
                          is_bf16: bool = True
                         ):
     softmax_scale = (qlist[0].shape[-1] * 2) ** (-0.5)
-    return fp4attn4_cuda.fwd(qlist[0], klist[0], vlist[0], qlist[1], klist[1], vlist[1], delta_s, lambda_k, KL, None, softmax_scale, is_causal, per_block_mean, is_bf16)
+    return fp4attn4_cuda.fwd(qlist[0], klist[0], vlist[0], qlist[1], klist[1], vlist[1], delta_s, lambda_k, QL, KL, None, softmax_scale, is_causal, per_block_mean, is_bf16)
 
 
 def last_fwd_used_specialized() -> bool:
@@ -261,6 +283,7 @@ def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_
     vlist_from_cuda,
     delta_s,
     lambdaK,
+    QL,
     KL,
     is_causal,
     per_block_mean,

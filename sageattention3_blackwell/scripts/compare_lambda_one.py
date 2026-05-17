@@ -110,6 +110,7 @@ def sageattn4_lambda_one(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> t
         vlist,
         delta_s,
         lamb,
+        q_len,
         packed_logical_len(k_len),
         False,
         True,

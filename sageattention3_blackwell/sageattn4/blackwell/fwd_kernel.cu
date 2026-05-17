@@ -250,6 +250,7 @@ void SAGEATTN4_FWD_RUN(Flash_fwd_params &params, cudaStream_t stream) {
             .ptr_lambK = static_cast<float const*>(params.lamb_k_ptr),
             .shape_lambK = {1, params.seqlen_k, params.h_k, params.b},
             .stride_lambK = {0, _1{}, params.lamb_k_head_stride, params.lamb_k_batch_stride},
+            .unpadded_seqlen_q = params.unpadded_seqlen_q,
             .softmax_scale_log2 = params.scale_softmax_log2
         });
     Epilogue::Params epilogue_params =

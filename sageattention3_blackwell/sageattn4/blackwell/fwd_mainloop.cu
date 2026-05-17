@@ -149,6 +149,7 @@ struct Mainloop {
         ShapeQKV const shape_lambK;
         StrideQKV const stride_lambK;
 
+        int const unpadded_seqlen_q;
         float const softmax_scale_log2;
     };
 
@@ -163,6 +164,7 @@ struct Mainloop {
         LayoutSF const layout_SFVt;
         LayoutDS const layout_DS;
         LayoutLambK const layout_lambK;
+        int const unpadded_seqlen_q;
         TMA_Q tma_load_Q;
         TMA_SFQ tma_load_SFQ;
         TMA_KV tma_load_K;
@@ -248,6 +250,7 @@ struct Mainloop {
                 args.shape_K, args.unpadded_shape_K, layout_sfk,
                 args.shape_Vt, layout_sfvt,
                 layout_ds, layout_lambK,
+                args.unpadded_seqlen_q,
                 tma_load_Q, tma_load_sfq,
                 tma_load_K, tma_load_sfk,
                 tma_load_Vt, tma_load_sfvt,
@@ -268,16 +271,55 @@ struct Mainloop {
         cute::prefetch_tma_descriptor(mainloop_params.tma_load_DS.get_tma_descriptor());
     }
 
+    CUTE_HOST_DEVICE
+    static int packed_key_to_logical_token(int packed_key_pos) {
+        static_assert(QUANT_BLOCK_SIZE == 8);
+        constexpr int kLogicalTokensPerPack = QUANT_BLOCK_SIZE - 1;
+        int const group = packed_key_pos / QUANT_BLOCK_SIZE;
+        int const lane = packed_key_pos - group * QUANT_BLOCK_SIZE;
+        int const logical_lane = lane == 0 ? 0 : lane - 1;
+        return group * kLogicalTokensPerPack + logical_lane;
+    }
+
+    CUTE_HOST_DEVICE
+    static int packed_len_to_logical_len(int packed_len) {
+        static_assert(QUANT_BLOCK_SIZE == 8);
+        constexpr int kLogicalTokensPerPack = QUANT_BLOCK_SIZE - 1;
+        int const full_groups = packed_len / QUANT_BLOCK_SIZE;
+        int const remainder = packed_len - full_groups * QUANT_BLOCK_SIZE;
+        int const remainder_logical = remainder == 0 ? 0 : remainder - 1;
+        return full_groups * kLogicalTokensPerPack + remainder_logical;
+    }
+
+    CUTE_HOST_DEVICE
+    static int logical_len_to_packed_len(int logical_len) {
+        static_assert(QUANT_BLOCK_SIZE == 8);
+        constexpr int kLogicalTokensPerPack = QUANT_BLOCK_SIZE - 1;
+        if (logical_len <= 0) {
+            return 0;
+        }
+        int const full_groups = logical_len / kLogicalTokensPerPack;
+        int const remainder = logical_len - full_groups * kLogicalTokensPerPack;
+        return full_groups * QUANT_BLOCK_SIZE + (remainder == 0 ? 0 : remainder + 1);
+    }
+
     CUTLASS_DEVICE
     int get_n_block_max(Params const& mainloop_params, int m_block) {
         static constexpr int kBlockM = get<0>(TileShape_MNK{});
         static constexpr int kBlockN = get<1>(TileShape_MNK{});
-        int const seqlen_q = get<0>(mainloop_params.shape_Q);
         int const seqlen_k = get<0>(mainloop_params.shape_K);
         int n_block_max = cute::ceil_div(seqlen_k, kBlockN);
         if constexpr (Is_causal) {
-            n_block_max = std::min(n_block_max,
-                                   cute::ceil_div((m_block + 1) * kBlockM + seqlen_k - seqlen_q, kBlockN));
+            int const logical_seqlen_q = mainloop_params.unpadded_seqlen_q;
+            int const logical_seqlen_k = packed_len_to_logical_len(get<0>(mainloop_params.unpadded_shape_K));
+            int const tile_q_start = m_block * kBlockM;
+            int const tile_q_end = std::min((m_block + 1) * kBlockM, logical_seqlen_q);
+            if (tile_q_end <= tile_q_start) {
+                return 0;
+            }
+            int const logical_col_limit = tile_q_end + logical_seqlen_k - logical_seqlen_q;
+            int const packed_col_limit = logical_len_to_packed_len(logical_col_limit);
+            n_block_max = std::min(n_block_max, cute::ceil_div(packed_col_limit, kBlockN));
         }
         return n_block_max;
     }
@@ -676,9 +718,10 @@ struct Mainloop {
             pipeline.consumer_wait(smem_pipe_read, barrier_token);
         };
 
-        int const seqlen_q = get<0>(mainloop_params.shape_Q);
         int const seqlen_k = get<0>(mainloop_params.shape_K);
         int const unpadded_seqlen_k = get<0>(mainloop_params.unpadded_shape_K);
+        int const logical_seqlen_q = mainloop_params.unpadded_seqlen_q;
+        int const logical_seqlen_k = packed_len_to_logical_len(unpadded_seqlen_k);
         int n_block = n_block_count - 1;
 
         auto copy_k_block = [&](auto block_id) {
@@ -775,9 +818,49 @@ struct Mainloop {
                 a1 = elem_op(a1, mean1, lamb_k_0);
                 a2 = elem_op(a2, mean0, lamb_k_1);
                 a3 = elem_op(a3, mean1, lamb_k_1);
+            }
+        };
 
-                a0.x = -INFINITY;
-                a1.x = -INFINITY;
+        auto set_mean_slot_to_first_score = [&](auto& acc, int key_block) {
+            auto acc_float4 = recast<float4>(acc);
+            int const quad_id = (thread_idx % 4) * 2;
+            int const row0 = (thread_idx / 32) * 16 + ((thread_idx % 32) / 4);
+            int const row1 = row0 + 8;
+            int const query_pos0 = m_block * kBlockM + row0;
+            int const query_pos1 = m_block * kBlockM + row1;
+
+            auto can_use_mean_slot = [&](int query_pos, int packed_key_pos) {
+                if constexpr (!Is_causal) {
+                    return true;
+                } else {
+                    int const global_col = key_block * kBlockN + packed_key_pos;
+                    if (global_col >= unpadded_seqlen_k) {
+                        return false;
+                    }
+                    int const query_key_pos = query_pos + logical_seqlen_k - logical_seqlen_q;
+                    if (query_key_pos < 0) {
+                        return false;
+                    }
+                    int const key_group = global_col / QUANT_BLOCK_SIZE;
+                    int const query_group = query_key_pos / (QUANT_BLOCK_SIZE - 1);
+                    return key_group < query_group;
+                }
+            };
+
+            CUTLASS_PRAGMA_UNROLL
+            for (int i = 0; i < 4; i++) {
+                int const num = quad_id + i * 8;
+                int const packed_key_pos0 = 4 * num;
+                auto& a0 = acc_float4(make_coord(make_coord(_0{}, _0{}), _0{}), _0{}, i);
+                auto& a1 = acc_float4(make_coord(make_coord(_0{}, _0{}), _1{}), _0{}, i);
+
+                if constexpr (BlockMean) {
+                    a0.x = -INFINITY;
+                    a1.x = -INFINITY;
+                } else {
+                    a0.x = can_use_mean_slot(query_pos0, packed_key_pos0) ? a0.y : -INFINITY;
+                    a1.x = can_use_mean_slot(query_pos1, packed_key_pos0) ? a1.y : -INFINITY;
+                }
             }
         };
 
@@ -809,24 +892,52 @@ struct Mainloop {
             }
         }
 
-        auto col_limit_causal = [&](int row, int n_block) {
-            return row + 1 + seqlen_k - n_block * kBlockN - seqlen_q + m_block * kBlockM;
-        };
-        {
-            Tensor cS = cute::make_identity_tensor(select<0, 1>(TileShape_MNK{}));
-            Tensor tScS = thread_mma_qk.partition_C(cS);
-            CUTLASS_PRAGMA_UNROLL
-            for (int i = 0; i < size(tSrS); ++i) {
-                if constexpr (!Is_causal) {  // Just masking based on col
-                    if (int(get<1>(tScS(i))) >= int(unpadded_seqlen_k - n_block * kBlockN)) { tSrS(i) = -INFINITY; }
-                } else { 
-                    if (int(get<1>(tScS(i))) >= std::min(seqlen_k - n_block * kBlockN,
-                                                        col_limit_causal(int(get<0>(tScS(i))), n_block))) {
-                        tSrS(i) = -INFINITY;
-                    }
+        auto mask_scores = [&](auto& scores, int key_block) {
+            auto mask_lane = [&](float& score, int query_pos, int packed_key_pos) {
+                int const global_col = key_block * kBlockN + packed_key_pos;
+                bool should_mask = global_col >= unpadded_seqlen_k;
+                if constexpr (Is_causal) {
+                    int const logical_col_limit = query_pos + 1 + logical_seqlen_k - logical_seqlen_q;
+                    int const key_token = packed_key_to_logical_token(global_col);
+                    should_mask = should_mask || key_token >= logical_col_limit;
                 }
+                if (should_mask) {
+                    score = -INFINITY;
+                }
+            };
+            auto mask_float4 = [&](float4& score, int query_pos, int packed_key_pos) {
+                mask_lane(score.x, query_pos, packed_key_pos + 0);
+                mask_lane(score.y, query_pos, packed_key_pos + 1);
+                mask_lane(score.z, query_pos, packed_key_pos + 2);
+                mask_lane(score.w, query_pos, packed_key_pos + 3);
+            };
+
+            auto acc_float4 = recast<float4>(scores);
+            int const quad_id = (thread_idx % 4) * 2;
+            int const row0 = (thread_idx / 32) * 16 + ((thread_idx % 32) / 4);
+            int const row1 = row0 + 8;
+            int const query_pos0 = m_block * kBlockM + row0;
+            int const query_pos1 = m_block * kBlockM + row1;
+
+            CUTLASS_PRAGMA_UNROLL
+            for (int i = 0; i < 4; i++) {
+                int const num = quad_id + i * 8;
+                int const packed_key_pos0 = 4 * num;
+                int const packed_key_pos1 = 4 * (num + 1);
+
+                auto& a0 = acc_float4(make_coord(make_coord(_0{}, _0{}), _0{}), _0{}, i);
+                auto& a1 = acc_float4(make_coord(make_coord(_0{}, _0{}), _1{}), _0{}, i);
+                auto& a2 = acc_float4(make_coord(make_coord(_0{}, _1{}), _0{}), _0{}, i);
+                auto& a3 = acc_float4(make_coord(make_coord(_0{}, _1{}), _1{}), _0{}, i);
+
+                mask_float4(a0, query_pos0, packed_key_pos0);
+                mask_float4(a1, query_pos1, packed_key_pos0);
+                mask_float4(a2, query_pos0, packed_key_pos1);
+                mask_float4(a3, query_pos1, packed_key_pos1);
             }
-        }
+        };
+        mask_scores(tSrS, n_block);
+        set_mean_slot_to_first_score(tSrS, n_block);
         auto quantize = [&](auto mma_k, auto acc_conversion_view) {
             Tensor AbsMaxP_stagek = AbsMaxP(_, make_coord(_, _, mma_k));
             Tensor acc_conversion_stagek = acc_conversion_view(_, _, mma_k);
@@ -876,7 +987,8 @@ struct Mainloop {
             }
         };
 
-        softmax_fused.template online_softmax_with_quant</*Is_first=*/true>(tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
+        softmax_fused.template online_softmax_with_quant</*Is_first=*/true, /*InfCheck=*/false, /*MaskMeanSlot=*/true>(
+            tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
 
         consumer_wait(pipeline_v, smem_pipe_read_v);
         copy_v_block(_0{});
@@ -895,7 +1007,7 @@ struct Mainloop {
         }
         
         n_block--;
-        constexpr int n_masking_steps = !Is_causal ? 1 : cute::ceil_div(kBlockM, kBlockN) + 1;
+        constexpr int n_masking_steps = !Is_causal ? 1 : cute::ceil_div(kBlockM * QUANT_BLOCK_SIZE, kBlockN * (QUANT_BLOCK_SIZE - 1)) + 1;
         // // Only go through these if Is_causal, since n_masking_steps = 1 when !Is_causal
         CUTLASS_PRAGMA_UNROLL
         for (int masking_step = 0; masking_step < n_masking_steps - 1 && n_block >= 0; ++masking_step, --n_block) {
@@ -915,15 +1027,10 @@ struct Mainloop {
             correct_lamb_k(tSrS);
             pipeline_k.consumer_release(smem_pipe_read_k);  // release K
             ++smem_pipe_read_k;
-            Tensor cS = cute::make_identity_tensor(select<0, 1>(TileShape_MNK{}));
-            Tensor tScS = thread_mma_qk.partition_C(cS);
-            #pragma unroll
-            for (int i = 0; i < size(tSrS); ++i) {
-                if (int(get<1>(tScS(i))) >= col_limit_causal(int(get<0>(tScS(i))), n_block - 1)) {
-                    tSrS(i) = -INFINITY;
-                }
-            }
-            softmax_fused.template online_softmax_with_quant</*Is_first=*/false>(tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
+            mask_scores(tSrS, n_block);
+            set_mean_slot_to_first_score(tSrS, n_block);
+            softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MaskMeanSlot=*/true>(
+                tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
             Tensor tOrO = make_fragment_like(tOrO_store);
             consumer_wait(pipeline_v, smem_pipe_read_v);
             copy_v_block(_0{});
@@ -939,7 +1046,7 @@ struct Mainloop {
             }
             pipeline_v.consumer_release(smem_pipe_read_v);
             ++smem_pipe_read_v;
-            if (masking_step > 0) { softmax_fused.rescale_o(tOrO_store, tOrO); }
+            softmax_fused.rescale_o(tOrO_store, tOrO);
         }
 
         #pragma unroll 1
@@ -961,7 +1068,10 @@ struct Mainloop {
                     ++smem_pipe_read_k;
                 }
             }
-            softmax_fused.template online_softmax_with_quant</*Is_first=*/false>(tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
+            mask_scores(tSrS, n_block);
+            set_mean_slot_to_first_score(tSrS, n_block);
+            softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MaskMeanSlot=*/true>(
+                tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
             Tensor tOrO = make_fragment_like(tOrO_store);
             consumer_wait(pipeline_v, smem_pipe_read_v);
             copy_v_block(_0{});

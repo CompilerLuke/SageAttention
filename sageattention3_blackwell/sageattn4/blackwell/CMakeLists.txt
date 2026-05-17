@@ -75,7 +75,12 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-set(SAGEATTN4_SPECIALIZED_KERNEL_SOURCE "${CMAKE_CURRENT_LIST_DIR}/fwd_kernel.cu")
+set(SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_NONCAUSAL "${CMAKE_CURRENT_BINARY_DIR}/fwd_kernel_blockmean0_noncausal.cu")
+set(SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_CAUSAL "${CMAKE_CURRENT_BINARY_DIR}/fwd_kernel_blockmean0_causal.cu")
+file(WRITE "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_NONCAUSAL}" "#include \"${CMAKE_CURRENT_LIST_DIR}/fwd_kernel.cu\"\n")
+file(WRITE "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_CAUSAL}" "#include \"${CMAKE_CURRENT_LIST_DIR}/fwd_kernel.cu\"\n")
+set_source_files_properties("${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_NONCAUSAL}" PROPERTIES COMPILE_DEFINITIONS "SAGEATTN4_FWD_BUILD_CAUSAL=0")
+set_source_files_properties("${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_CAUSAL}" PROPERTIES COMPILE_DEFINITIONS "SAGEATTN4_FWD_BUILD_CAUSAL=1")
 
 set(NVIDIA_CUDA_LIBRARY_HEADER_SHIM_DIR "")
 if(NVIDIA_CUDA_PACKAGE_INCLUDE_DIR)
@@ -175,15 +180,16 @@ function(configure_sageattn4_cuda_extension TARGET_NAME)
   endif()
 endfunction()
 
-add_library(fp4attn4_cuda MODULE
+add_library(sageattn4_fwd_cuda MODULE
   "${CMAKE_CURRENT_LIST_DIR}/api.cpp"
-  "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE}"
+  "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_NONCAUSAL}"
+  "${SAGEATTN4_SPECIALIZED_KERNEL_SOURCE_CAUSAL}"
   ${BLACKWELL_HEADERS}
 )
-configure_sageattn4_cuda_extension(fp4attn4_cuda)
+configure_sageattn4_cuda_extension(sageattn4_fwd_cuda)
 
-add_library(fp4quant4_cuda MODULE
+add_library(sageattn4_quant_cuda MODULE
   "${SAGEATTN3_DIR}/quantization/fp4_quantization_4d.cu"
   ${QUANTIZATION_HEADERS}
 )
-configure_sageattn4_cuda_extension(fp4quant4_cuda)
+configure_sageattn4_cuda_extension(sageattn4_quant_cuda)
