@@ -198,28 +198,59 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
 
 void SAGEATTN4_FWD_RUN(Flash_fwd_params &params, cudaStream_t stream) {
     using Scheduler = flash::StaticPersistentTileScheduler;
+    /*
+    *    struct Arguments {
+    Element const* ptr_Q;
+    ShapeQKV const shape_Q;
+    StrideQKV const stride_Q;
+    Element const* ptr_K;
+    ShapeQKV const shape_K;
+    StrideQKV const stride_K;
+    ShapeQKV const unpadded_shape_K;
+    Element const* ptr_Vt;
+    ShapeQKV const shape_Vt;
+    StrideQKV const stride_Vt;
+    ElementSF const* ptr_SFQ{nullptr};
+    ShapeSF const shape_SFQ{};
+    ElementSF const* ptr_SFK{nullptr};
+    ShapeSF const shape_SFK{};
+    ElementSF const* ptr_SFVt{nullptr};
+    ShapeSF const shape_SFVt{};
+    float const* ptr_ds;
+    ShapeQKV const shape_ds;
+    StrideQKV const stride_ds;
+
+    float const* ptr_lambK;
+    ShapeQKV const shape_lambK;
+    StrideQKV const stride_lambK;
+
+    float const softmax_scale_log2;
+    };*/
     Mainloop::Params mainloop_params =
-        Mainloop::to_underlying_arguments({
-            static_cast<Element const*>(params.q_ptr),
-            {params.seqlen_q, params.d, params.h, params.b},
-            {params.q_row_stride, _1{}, params.q_head_stride, params.q_batch_stride},
-            static_cast<Element const*>(params.k_ptr),
-            {params.seqlen_k, params.d, params.h_k, params.b},
-            {params.k_row_stride, _1{}, params.k_head_stride, params.k_batch_stride},
-            {params.unpadded_seqlen_k, params.d, params.h_k, params.b},
-            static_cast<Element const*>(params.v_ptr),
-            {params.d, params.seqlen_k, params.h_k, params.b},
-            {params.v_row_stride, _1{}, params.v_head_stride, params.v_batch_stride},
-            static_cast<ElementSF const*>(params.sfq_ptr),
-            {params.seqlen_q, params.d, params.h, params.b},
-            static_cast<ElementSF const*>(params.sfk_ptr),
-            {params.seqlen_k, params.d, params.h_k, params.b},
-            static_cast<ElementSF const*>(params.sfv_ptr),
-            {params.d, params.seqlen_k, params.h_k, params.b},
-            static_cast<float const*>(params.delta_s_ptr),
-            {params.seqlen_s, params.seqlen_k, params.h_k, params.b},
-            {params.ds_row_stride, _1{}, params.ds_head_stride, params.ds_batch_stride},
-            params.scale_softmax_log2
+        Mainloop::to_underlying_arguments(Mainloop::Arguments{
+            .ptr_Q = static_cast<Element const*>(params.q_ptr),
+            .shape_Q = {params.seqlen_q, params.d, params.h, params.b},
+            .stride_Q = {params.q_row_stride, _1{}, params.q_head_stride, params.q_batch_stride},
+            .ptr_K = static_cast<Element const*>(params.k_ptr),
+            .shape_K = {params.seqlen_k, params.d, params.h_k, params.b},
+            .stride_K = {params.k_row_stride, _1{}, params.k_head_stride, params.k_batch_stride},
+            .unpadded_shape_K = {params.unpadded_seqlen_k, params.d, params.h_k, params.b},
+            .ptr_Vt = static_cast<Element const*>(params.v_ptr),
+            .shape_Vt = {params.d, params.seqlen_k, params.h_k, params.b},
+            .stride_Vt = {params.v_row_stride, _1{}, params.v_head_stride, params.v_batch_stride},
+            .ptr_SFQ = static_cast<ElementSF const*>(params.sfq_ptr),
+            .shape_SFQ = {params.seqlen_q, params.d, params.h, params.b},
+            .ptr_SFK = static_cast<ElementSF const*>(params.sfk_ptr),
+            .shape_SFK = {params.seqlen_k, params.d, params.h_k, params.b},
+            .ptr_SFVt = static_cast<ElementSF const*>(params.sfv_ptr),
+            .shape_SFVt ={params.d, params.seqlen_k, params.h_k, params.b},
+            .ptr_ds = static_cast<float const*>(params.delta_s_ptr),
+            .shape_ds = {params.seqlen_s, params.seqlen_k, params.h_k, params.b},
+            .stride_ds = {params.ds_row_stride, _1{}, params.ds_head_stride, params.ds_batch_stride},
+            .ptr_lambK = static_cast<float const*>(params.lamb_k_ptr),
+            .shape_lambK = {1, params.seqlen_k, params.h_k, params.b},
+            .stride_lambK = {0, _1{}, params.lamb_k_head_stride, params.lamb_k_batch_stride},
+            .softmax_scale_log2 = params.scale_softmax_log2
         });
     Epilogue::Params epilogue_params =
         Epilogue::to_underlying_arguments({

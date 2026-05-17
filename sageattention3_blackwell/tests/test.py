@@ -34,13 +34,18 @@ class AttentionUnitTest(TestCase):
         ref = F.scaled_dot_product_attention(q, k, v, is_causal=False)
 
         err = 1-F.cosine_similarity(out, ref, dim=-1).mean()
+        err_l1 = F.l1_loss(out, ref).mean()
         thresh = 0.01
-        if err > thresh:
+        thresh_l1 = 0.01
+        if err > thresh or err_l1 > thresh:
             print("==== REF ====")
             print(ref[0, 0, :8, :1])
             print("==== OUT ====")
             print(out[0, 0, :8, :1])
+        else:
+            print("Err=", err, "err l1=", err_l1)
         self.assertLess(err, thresh)
+        self.assertLess(err_l1, thresh_l1)
 
 if __name__ == '__main__':
     unittest.main()

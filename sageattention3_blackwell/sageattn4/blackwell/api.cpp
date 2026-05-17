@@ -64,6 +64,7 @@ void set_params_fprop(Flash_fwd_params &params,
                       const at::Tensor k,
                       const at::Tensor v,
                       const at::Tensor delta_s,
+                      const at::Tensor lamb_k,
                       at::Tensor out,
                       const at::Tensor sfq,
                       const at::Tensor sfk,
@@ -88,6 +89,7 @@ void set_params_fprop(Flash_fwd_params &params,
     params.k_ptr = k.data_ptr();
     params.v_ptr = v.data_ptr();
     params.delta_s_ptr = delta_s.data_ptr();
+    params.lamb_k_ptr = lamb_k.data_ptr();
     params.sfq_ptr = sfq.data_ptr();
     params.sfk_ptr = sfk.data_ptr();
     params.sfv_ptr = sfv.data_ptr();
@@ -102,6 +104,10 @@ void set_params_fprop(Flash_fwd_params &params,
 
     params.ds_row_stride = delta_s.stride(-2);
     params.ds_head_stride = delta_s.stride(-3);
+
+    params.lamb_k_row_stride = 0; /* unlike ds, lamb_k does not depend on query */
+    params.lamb_k_head_stride = lamb_k.stride(-2); /* lamb_k last dimension is sequence dimension */
+    params.lamb_k_batch_stride = lamb_k.stride(0);
     
     params.sfq_row_stride = sfq.stride(-2);
     params.sfk_row_stride = sfk.stride(-2);
@@ -230,6 +236,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
         const at::Tensor &sfk,
         const at::Tensor &sfv,
         const at::Tensor &delta_s,
+        const at::Tensor &lamb_k,
         int unpadded_k,
         c10::optional<at::Tensor> &out_,             // batch_size x seqlen_q x num_heads x head_size
         const float softmax_scale,
@@ -259,10 +266,13 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     TORCH_CHECK(k.stride(-1) == 1, "Input tensor must have contiguous last dimension");
     TORCH_CHECK(v.stride(-1) == 1, "Input tensor must have contiguous last dimension");
     TORCH_CHECK(delta_s.stride(-1) == 1, "Input tensor must have contiguous last dimension");
+    TORCH_CHECK(lamb_k.stride(-1) == 1, "Input tensor must have contiguous last dimension");
 
     TORCH_CHECK(q.is_contiguous(), "Input tensor must be contiguous");
     TORCH_CHECK(k.is_contiguous(), "Input tensor must be contiguous");
     TORCH_CHECK(v.is_contiguous(), "Input tensor must be contiguous");
+    TORCH_CHECK(lamb_k.is_contiguous(), "Input tensor must be contiguous");
+    TORCH_CHECK(lamb_k.dtype() == torch::kFloat32, "lambda_k dtype must be float32");
 
     const auto sizes = q.sizes();
     auto opts = q.options();
@@ -284,6 +294,8 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     CHECK_SHAPE(q, batch_size, num_heads, seqlen_q, head_size_og);
     CHECK_SHAPE(k, batch_size, num_heads_k, seqlen_k, head_size_og);
     CHECK_SHAPE(v, batch_size, num_heads_k, unpacked_head_size, seqlen_k/2);
+
+    CHECK_SHAPE(lamb_k, batch_size, num_heads_k, seqlen_k);
     // CHECK_SHAPE(delta_s, batch_size, num_heads, seqlen_q / 128, seqlen_k);
     // CHECK_SHAPE(sfq, batch_size, seqlen_q, num_heads, unpacked_head_size);
     // CHECK_SHAPE(sfk, batch_size, seqlen_k, num_heads_k, unpacked_head_size);
@@ -303,12 +315,11 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{(char)q.get_device()};
 
-    
 
     auto softmax_lse = torch::empty({batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
     at::Tensor p;
 
-    std::cout << "Launching mha fwd2:" << "B=" << batch_size << ", seqlen=" << seqlen_q << "per_block_mean=" << per_block_mean << std::endl;
+    std::cout << "Launching mha fwd4!:" << "B=" << batch_size << ", seqlen=" << seqlen_q << "per_block_mean=" << per_block_mean << std::endl;
 
     Flash_fwd_params params;
     set_params_fprop(params,
@@ -317,7 +328,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
                      seqlen_q_rounded, seqlen_k_rounded,
                      num_heads, num_heads_k,
                      unpacked_head_size, unpacked_head_size,
-                     q, k, v, delta_s, out, 
+                     q, k, v, delta_s, lamb_k, out,
                      sfq, sfk, sfv,
                      /*cu_seqlens_q_d=*/nullptr,
                      /*cu_seqlens_k_d=*/nullptr,

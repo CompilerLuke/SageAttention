@@ -38,6 +38,7 @@ struct Qkv_params {
     void *__restrict__ k_ptr;
     void *__restrict__ v_ptr;
     void *__restrict__ delta_s_ptr;
+    void *__restrict__ lamb_k_ptr;
     // The QKV scale factor matrices.
     void *__restrict__ sfq_ptr;
     void *__restrict__ sfk_ptr;
@@ -55,6 +56,11 @@ struct Qkv_params {
     index_t ds_batch_stride;
     index_t ds_row_stride;
     index_t ds_head_stride;
+
+    index_t lamb_k_batch_stride;
+    index_t lamb_k_row_stride;
+    index_t lamb_k_head_stride;
+
     // The stride of the Q, K and V scale factor matrices.
     index_t sfq_batch_stride;
     index_t sfk_batch_stride;

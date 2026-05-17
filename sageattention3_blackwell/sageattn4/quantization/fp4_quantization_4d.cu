@@ -130,6 +130,37 @@ struct PackedVec {
   typename TypeConverter<Type>::Type elts[8];
 };
 
+// ==== V1 =====
+// [0, 1, 8, 9, 16, 17, 24, 25, 2, 3, 10, 11, 18, 19, 26, 27, 4, 5, 12, 13, 20, 21, 28, 29, 6, 7, 14, 15, 22, 23, 30, 31]
+
+// ==== V2 =====
+// [0, 1  ]  [2, 3] [4, 5] [6, 7] [6, 3]
+// [16, 17]
+// [32, 33]
+// [48, 49]
+// [56, 57]
+// [72, 73]
+// [96, 97]
+// []
+
+HOST_DEVICE_INLINE
+int permute_token_within_block(int local_token_id) {
+#if 1
+  int local_token_id_residue = local_token_id % 32;
+  return (local_token_id / 32) * 32 +
+            (local_token_id_residue / 8) * 2 +
+            ((local_token_id_residue % 8) / 2) * 8 +
+            (local_token_id_residue % 8) % 2;
+#else
+  static_assert(false); // This permutation would allow contiguous token_ids per thread, but it is not clear how to match layout for value permutation
+    int local_token_id_residue = local_token_id % 128;
+  return (local_token_id_residue / 128)*128 +
+          (local_token_id_residue / 16) * 2 +
+          ((local_token_id_residue % 16) / 2) * 16 +
+          (local_token_id_residue % 16) % 2;
+#endif
+}
+
 template <uint32_t head_dim, uint32_t BLOCK_SIZE, bool permute, typename T>
 __global__ void scaled_fp4_quant_kernel(
     const T* input, uint8_t* output, uint8_t* output_sf,
@@ -159,19 +190,7 @@ __global__ void scaled_fp4_quant_kernel(
     load_token_id = token_id;
   } else {
     int local_token_id = threadIdx.x / NUM_THREADS_PER_TOKEN;
-    int local_token_id_residue = local_token_id % 32;
-    // [0, 1, 8, 9, 16, 17, 24, 25, 2, 3, 10, 11, 18, 19, 26, 27, 4, 5, 12, 13, 20, 21, 28, 29, 6, 7, 14, 15, 22, 23, 30, 31]
-    load_token_id = token_block_id * BLOCK_SIZE + (local_token_id / 32) * 32 +
-                    (local_token_id_residue / 8) * 2 + 
-                    ((local_token_id_residue % 8) / 2) * 8 +
-                    (local_token_id_residue % 8) % 2;
-
-    /*
-    0 1 8 9 16 17 24 25 2 3 10 11 18 19 26 27 4 5 12 13 20 21 28 29 6 7 14 15 22 23 30 31
-    32 33 40 41 48 49 56 57 34 35 42 43 50 51 58 59 36 37 44 45 52 53 60 61 38 39 46 47 54 55 62 63
-    64 65 72 73 80 81 88 89 66 67 74 75 82 83 90 91 68 69 76 77 84 85 92 93 70 71 78 79 86 87 94 95
-    96 97 104 105 112 113 120 121 98 99 106 107 114 115 122 123 100 101 108 109 116 117 124 125 102 103 110 111 118 119 126 127
-    */
+    load_token_id = token_block_id * BLOCK_SIZE + permute_token_within_block(local_token_id);
   }
 
   PackedVec in_vec;

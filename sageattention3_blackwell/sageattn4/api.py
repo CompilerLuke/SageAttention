@@ -19,9 +19,9 @@ import triton.language as tl
 import torch.nn.functional as F
 from typing import Tuple
 from torch.nn.functional import scaled_dot_product_attention as sdpa
+import einops as E
 import fp4attn4_cuda
 import fp4quant4_cuda
-
 
 @triton.jit
 def group_mean_kernel(
@@ -71,25 +71,82 @@ def triton_group_mean(q: torch.Tensor):
     )
     return q_out, qm
 
+def ceil_div(a,b):
+    return (a+b-1) // b
 
-def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_mean: bool = True):
+def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_mean: bool, quant_block_size: int):
+    B,H,_,D = q.shape
+    device = q.device
 
-    def pad_128(x):
+    def pad_to_block(x, N):
         L = x.size(2)
-        pad_len = (128 - L % 128) % 128
+        pad_len = (N - L % N) % N
         if pad_len == 0:
             return x.contiguous()
         return F.pad(x, (0, 0, 0, pad_len), value=0).contiguous()
-    
-    k -= k.mean(dim=-2, keepdim=True)  
-    q, k, v = map(lambda x: pad_128(x), [q, k, v])
+    def quant_pack_k(x):
+        Q = quant_block_size-1
+        x = pad_to_block(x, Q)
+        T = x.size(-2)
+        x_block = E.rearrange(x, 'b h (n m) d -> b h n m d', n=T//Q, m=Q)
+        x_mean = x_block.mean(dim=-2)
+        x_norm = torch.norm(x_mean, dim=-1)
+        lamb = torch.einsum('b h n m d, b h n d -> b h n m', x_block, x_mean / (x_norm**2).unsqueeze(-1))
+
+        x_res = x_block - lamb.unsqueeze(-1) * x_mean.unsqueeze(-2)
+        lamb = torch.cat([
+            torch.zeros((B,H,T//Q,1), device=device, dtype=torch.float32),
+            lamb.to(torch.float32)
+        ], dim=-1)
+        x_block = torch.cat([
+            x_mean.unsqueeze(-2),
+            x_res
+        ], dim=-2)
+        x_block = x_block.reshape(B,H,T//Q*(Q+1),D)
+        lamb = lamb.reshape(B,H,T//Q*(Q+1))
+        return x_block, lamb
+    def quant_pack_v(x):
+        Q = quant_block_size-1
+        x = pad_to_block(x, Q)
+        T = x.size(-2)
+        x_block = E.rearrange(x, 'b h (n m) d -> b h n m d', n=T//Q, m=Q)
+
+        x_mean = torch.ones((B,H,T//Q,D), device=device, dtype=torch.bfloat16)
+        x_res = x_block
+
+        #TODO: SMOOTH V-VALUES AS WELL to avoid padding waste
+        #x_mean = x_block.mean(dim=-2)
+        #x_res = x_block - x_mean.unsqueeze(-2)
+
+        x_block = torch.cat([
+            x_mean.unsqueeze(-2),
+            x_res
+        ], dim=-2)
+        x_block = x_block.reshape(B,H,T//Q*(Q+1),D)
+        return x_block
+
+    BLOCK_SIZE = 128
+
+    q = pad_to_block(q, N=BLOCK_SIZE)
     if per_block_mean:
         q, qm = triton_group_mean(q)
     else:
         qm = q.mean(dim=-2, keepdim=True)
         q = q - qm
+
+    k, k_lambda = quant_pack_k(k)
+    v = quant_pack_v(v)
+
+    k = pad_to_block(k, N=BLOCK_SIZE)
+    k_lambda = pad_to_block(k_lambda.unsqueeze(-1), N=BLOCK_SIZE).squeeze(-1)
+
     delta_s = torch.matmul(qm, k.transpose(-2, -1)).to(torch.float32).contiguous()
-    return q, k, v, delta_s
+
+    v = pad_to_block(v, N=BLOCK_SIZE)
+
+    print("k=", k.shape, "v=", v.shape)
+
+    return q, k, v, delta_s, k_lambda
 
 def scale_and_quant_fp4(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     assert x.ndim == 4
@@ -119,38 +176,60 @@ def blockscaled_fp4_attn(qlist: Tuple,
                          klist: Tuple,
                          vlist: Tuple,
                          delta_s: torch.Tensor,
+                         lambda_k: torch.Tensor,
                          KL: int,
                          is_causal: bool = False, 
                          per_block_mean: bool = True,
                          is_bf16: bool = True
                         ):
     softmax_scale = (qlist[0].shape[-1] * 2) ** (-0.5)
-    return fp4attn4_cuda.fwd(qlist[0], klist[0], vlist[0], qlist[1], klist[1], vlist[1], delta_s, KL, None, softmax_scale, is_causal, per_block_mean, is_bf16)
+    return fp4attn4_cuda.fwd(qlist[0], klist[0], vlist[0], qlist[1], klist[1], vlist[1], delta_s, lambda_k, KL, None, softmax_scale, is_causal, per_block_mean, is_bf16)
 
 
 def last_fwd_used_specialized() -> bool:
     return fp4attn4_cuda.last_fwd_used_specialized()
 
 
-def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, **kwargs):
+def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, quant_block = 8, **kwargs):
+    assert quant_block in [8]
+
     if q.size(-1) >= 256:
         print(f"Unsupported Headdim {q.size(-1)}")
         return sdpa(q, k, v, is_causal = is_causal)
+
+    assert q.dtype == torch.bfloat16, "TODO: support inputs other than bfloat16"
+
     QL = q.size(2)
     KL = k.size(2)
     is_bf16 = q.dtype == torch.bfloat16
-    q, k, v, delta_s = preprocess_qkv(q, k, v, per_block_mean)
+    q, k, v, delta_s, lambdaK = preprocess_qkv(q, k, v, per_block_mean, quant_block)
     qlist_from_cuda = scale_and_quant_fp4(q)
     klist_from_cuda = scale_and_quant_fp4_permute(k)
     vlist_from_cuda = scale_and_quant_fp4_transpose(v)
+
+    # CORRECT KEY LENGTH TO ACCOUNT FOR K_PACKING
+    # K_PACKING PACKS [K_MEAN K_RES0 K_RES1 ... K_RES_{Q-1}], which increases the sequence length
+    Q = quant_block - 1
+
+    print("KL BEFORE", KL)
+
+    if KL % Q == 0:
+        KL = KL // Q * (Q+1)
+    else:
+        KL = KL // Q * (Q+1) + 1 + (KL%Q)
+
+    print("KL AFTER", KL)
+
     o_fp4 = blockscaled_fp4_attn(
     qlist_from_cuda,
     klist_from_cuda, 
     vlist_from_cuda,
     delta_s,
+    lambdaK,
     KL,
     is_causal,
     per_block_mean,
     is_bf16
     )[0][:, :, :QL, :].contiguous()
+    print("output fp4")
     return o_fp4
