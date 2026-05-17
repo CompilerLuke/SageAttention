@@ -154,7 +154,7 @@ if not SKIP_CUDA_BUILD:
 
     ext_modules.append(
         CUDAExtension(
-            name="fp4attn4_cuda",
+            name="sageattn4_fwd_cuda",
             sources=[
                 "sageattn4/blackwell/api.cpp",
                 "sageattn4/blackwell/fwd_kernel.cu",
@@ -172,7 +172,7 @@ if not SKIP_CUDA_BUILD:
     )
     ext_modules.append(
         CUDAExtension(
-            name="fp4quant4_cuda",
+            name="sageattn4_quant_cuda",
             sources=["sageattn4/quantization/fp4_quantization_4d.cu"],
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],
