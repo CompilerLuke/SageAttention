@@ -4,22 +4,35 @@
 
 #include "params.h"
 
-#if defined(SAGEATTN4_FWD_BUILD_CAUSAL) && SAGEATTN4_FWD_BUILD_CAUSAL
+#if defined(SAGEATTN4_FWD_BUILD_BLOCK_MEAN) && SAGEATTN4_FWD_BUILD_BLOCK_MEAN && defined(SAGEATTN4_FWD_BUILD_CAUSAL) && SAGEATTN4_FWD_BUILD_CAUSAL
+#define SAGEATTN4_FWD_SPECIALIZATION_HEADER "sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal.h"
+#define SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal
+#define SAGEATTN4_FWD_FUNCTION_PREFIX sageattn4_hdim128_bm128_bn128_s3_blockmean1_causal_
+#define SAGEATTN4_FWD_IS_CAUSAL true
+#define SAGEATTN4_FWD_BLOCK_MEAN true
+#elif defined(SAGEATTN4_FWD_BUILD_BLOCK_MEAN) && SAGEATTN4_FWD_BUILD_BLOCK_MEAN
+#define SAGEATTN4_FWD_SPECIALIZATION_HEADER "sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1.h"
+#define SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1
+#define SAGEATTN4_FWD_FUNCTION_PREFIX sageattn4_hdim128_bm128_bn128_s3_blockmean1_
+#define SAGEATTN4_FWD_IS_CAUSAL false
+#define SAGEATTN4_FWD_BLOCK_MEAN true
+#elif defined(SAGEATTN4_FWD_BUILD_CAUSAL) && SAGEATTN4_FWD_BUILD_CAUSAL
 #define SAGEATTN4_FWD_SPECIALIZATION_HEADER "sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal.h"
 #define SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal
 #define SAGEATTN4_FWD_FUNCTION_PREFIX sageattn4_hdim128_bm128_bn128_s3_blockmean0_causal_
 #define SAGEATTN4_FWD_IS_CAUSAL true
+#define SAGEATTN4_FWD_BLOCK_MEAN false
 #else
 #define SAGEATTN4_FWD_SPECIALIZATION_HEADER "sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0.h"
 #define SAGEATTN4_FWD_SPECIALIZATION_NAMESPACE sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0
 #define SAGEATTN4_FWD_FUNCTION_PREFIX sageattn4_hdim128_bm128_bn128_s3_blockmean0_
 #define SAGEATTN4_FWD_IS_CAUSAL false
+#define SAGEATTN4_FWD_BLOCK_MEAN false
 #endif
 #define SAGEATTN4_FWD_HEAD_DIM 128
 #define SAGEATTN4_FWD_BLOCK_M 128
 #define SAGEATTN4_FWD_BLOCK_N 128
 #define SAGEATTN4_FWD_STAGES 3
-#define SAGEATTN4_FWD_BLOCK_MEAN false
 
 #define SAGEATTN4_JOIN_IMPL(a, b) a##b
 #define SAGEATTN4_JOIN(a, b) SAGEATTN4_JOIN_IMPL(a, b)

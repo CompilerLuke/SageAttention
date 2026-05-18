@@ -109,7 +109,7 @@ def round_to_token_blockscaled_fp4(x: torch.Tensor) -> torch.Tensor:
     """Round values as the transposed V fp4 path, grouping over tokens."""
     return round_to_blockscaled_fp4(x.transpose(-1, -2).contiguous()).transpose(-1, -2).contiguous()
 
-def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_mean: bool, quant_block_size: int):
+def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_mean: bool, quant_block_size: int, v_trick: bool | None = None):
     B,H,_,D = q.shape
     device = q.device
 
@@ -177,6 +177,8 @@ def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_
         return x_block
 
     BLOCK_SIZE = 128
+    if v_trick is None:
+        v_trick = not per_block_mean
 
     # Match sageattn3's softmax-invariant global K centering before padding/packing.
     k = k - k.mean(dim=-2, keepdim=True)
@@ -189,7 +191,7 @@ def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_
         q = q - qm
 
     k, k_lambda = quant_pack_k(k)
-    v = quant_pack_v(v, split_first=not per_block_mean)
+    v = quant_pack_v(v, split_first=v_trick)
 
     k = pad_to_block(k, N=BLOCK_SIZE)
     k_lambda = pad_to_block(k_lambda.unsqueeze(-1), N=BLOCK_SIZE).squeeze(-1)
@@ -199,8 +201,6 @@ def preprocess_qkv(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, per_block_
     delta_s = torch.matmul(qm, k.transpose(-2, -1)).to(torch.float32).contiguous()
 
     v = pad_to_block(v, N=BLOCK_SIZE)
-
-    print("k=", k.shape, "v=", v.shape)
 
     return q, k, v, delta_s, k_lambda
 
@@ -247,7 +247,7 @@ def last_fwd_used_specialized() -> bool:
     return fp4attn4_cuda.last_fwd_used_specialized()
 
 
-def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, quant_block = 8, **kwargs):
+def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, quant_block = 8, v_trick: bool | None = None, **kwargs):
     assert quant_block in [8]
 
     if q.size(-1) >= 256:
@@ -259,7 +259,7 @@ def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_
     QL = q.size(2)
     KL = k.size(2)
     is_bf16 = q.dtype == torch.bfloat16
-    q, k, v, delta_s, lambdaK = preprocess_qkv(q, k, v, per_block_mean, quant_block)
+    q, k, v, delta_s, lambdaK = preprocess_qkv(q, k, v, per_block_mean, quant_block, v_trick)
     qlist_from_cuda = scale_and_quant_fp4(q)
     klist_from_cuda = scale_and_quant_fp4_permute(k)
     vlist_from_cuda = scale_and_quant_fp4_transpose(v)
@@ -268,14 +268,10 @@ def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_
     # K_PACKING PACKS [K_MEAN K_RES0 K_RES1 ... K_RES_{Q-1}], which increases the sequence length
     Q = quant_block - 1
 
-    print("KL BEFORE", KL)
-
     if KL % Q == 0:
         KL = KL // Q * (Q+1)
     else:
         KL = KL // Q * (Q+1) + 1 + (KL%Q)
-
-    print("KL AFTER", KL)
 
     o_fp4 = blockscaled_fp4_attn(
     qlist_from_cuda,
@@ -289,5 +285,4 @@ def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_
     per_block_mean,
     is_bf16
     )[0][:, :, :QL, :].contiguous()
-    print("output fp4")
     return o_fp4

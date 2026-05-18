@@ -151,13 +151,26 @@ if not SKIP_CUDA_BUILD:
         cutlass_dir / "include",
         cutlass_dir / "tools" / "util" / "include",
     ]
+    generated_sources_dir = repo_dir / "build" / "generated_setup_sources"
+    generated_sources_dir.mkdir(parents=True, exist_ok=True)
+    fwd_kernel_source = (repo_dir / "sageattn4" / "blackwell" / "fwd_kernel.cu").as_posix()
+    fwd_kernel_wrappers = []
+    for block_mean in (0, 1):
+        for causal in (0, 1):
+            wrapper = generated_sources_dir / f"fwd_kernel_blockmean{block_mean}_causal{causal}.cu"
+            wrapper.write_text(
+                f"#define SAGEATTN4_FWD_BUILD_BLOCK_MEAN {block_mean}\n"
+                f"#define SAGEATTN4_FWD_BUILD_CAUSAL {causal}\n"
+                f"#include \"{fwd_kernel_source}\"\n"
+            )
+            fwd_kernel_wrappers.append(str(wrapper))
 
     ext_modules.append(
         CUDAExtension(
             name="sageattn4_fwd_cuda",
             sources=[
                 "sageattn4/blackwell/api.cpp",
-                "sageattn4/blackwell/fwd_kernel.cu",
+                *fwd_kernel_wrappers,
             ],
             extra_compile_args={
                 "cxx": ["-O3", "-std=c++17"],

@@ -34,6 +34,14 @@ namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_caus
 void sageattn4_hdim128_bm128_bn128_s3_blockmean0_causal_fwd(Flash_fwd_params &params, cudaStream_t stream);
 }  // namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal
 
+namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1 {
+void sageattn4_hdim128_bm128_bn128_s3_blockmean1_fwd(Flash_fwd_params &params, cudaStream_t stream);
+}  // namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1
+
+namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal {
+void sageattn4_hdim128_bm128_bn128_s3_blockmean1_causal_fwd(Flash_fwd_params &params, cudaStream_t stream);
+}  // namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal
+
 #define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
@@ -221,10 +229,9 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream, bool force_split
 
     TORCH_CHECK(
         params.d == 128 &&
-        !params.per_block_mean &&
         params.is_bf16,
         "SageAttention4 Blackwell has no generated specialized forward kernel for this config. ",
-        "Only head_dim=128, block_m=128, block_n=128, stages=3, block_mean=false, ",
+        "Only head_dim=128, block_m=128, block_n=128, stages=3, block_mean=true/false, ",
         "is_causal=true/false, input=nv_float4<float_e2m1>, output=bfloat16 is currently generated. ",
         "Requested head_dim=", params.d,
         ", per_block_mean=", params.per_block_mean,
@@ -233,7 +240,13 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream, bool force_split
     );
 
     flash::set_last_fwd_used_specialized(true);
-    if (params.is_causal) {
+    if (params.per_block_mean && params.is_causal) {
+        flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal::
+            sageattn4_hdim128_bm128_bn128_s3_blockmean1_causal_fwd(params, stream);
+    } else if (params.per_block_mean) {
+        flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1::
+            sageattn4_hdim128_bm128_bn128_s3_blockmean1_fwd(params, stream);
+    } else if (params.is_causal) {
         flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_causal::
             sageattn4_hdim128_bm128_bn128_s3_blockmean0_causal_fwd(params, stream);
     } else {
@@ -333,8 +346,6 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x (head_size
 
     auto softmax_lse = torch::empty({batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
     at::Tensor p;
-
-    std::cout << "Launching mha fwd4!:" << "B=" << batch_size << ", seqlen=" << seqlen_q << "per_block_mean=" << per_block_mean << std::endl;
 
     Flash_fwd_params params;
     set_params_fprop(params,
