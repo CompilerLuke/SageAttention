@@ -44,7 +44,7 @@ namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0_caus
     static constexpr int kNumSFPV = kBlockN / 16;
     static constexpr int kSFVectorSize = 16;
 
-    static constexpr int QUANT_BLOCK_SIZE = 8;
+    static constexpr int QUANT_BLOCK_SIZE = 16;
 
     using M = Int<128>;
     using N = Int<128>;

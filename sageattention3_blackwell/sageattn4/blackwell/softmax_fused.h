@@ -36,7 +36,7 @@ struct SoftmaxFused{
 
     CUTLASS_DEVICE SoftmaxFused(){};
 
-    template<bool FirstTile, bool InfCheck = false, bool MaskMeanSlot = false, typename TensorAcc, typename TensorMax>
+    template<bool FirstTile, bool InfCheck = false, int MeanSlotLanePeriod = 0, typename TensorAcc, typename TensorMax>
     CUTLASS_DEVICE auto online_softmax_with_quant(
         TensorAcc& acc, 
         TensorMax& AbsMaxP,
@@ -45,6 +45,14 @@ struct SoftmaxFused{
         Tensor acc_reduction_view = make_tensor(acc.data(), flash::convert_to_reduction_layout(acc.layout()));
         Tensor acc_conversion_view = make_tensor(acc.data(), flash::convert_to_conversion_layout(acc.layout()));
         Tensor acc_conversion_flatten = group_modes<1, 5>(group_modes<0, 2>(flatten(acc_conversion_view)));
+        auto skip_mean_slot = [](int ni) {
+            if constexpr (MeanSlotLanePeriod == 0) {
+                return false;
+            } else {
+                static_assert(MeanSlotLanePeriod == 1 || MeanSlotLanePeriod == 2);
+                return (ni % 8 == 0) && ((threadIdx.x & (MeanSlotLanePeriod - 1)) == 0);
+            }
+        };
         
         if constexpr (FirstTile) {
             fill(row_max, -INFINITY);
@@ -83,7 +91,7 @@ struct SoftmaxFused{
             for (int mi = 0; mi < size<0>(acc_reduction_view); mi++) {
                 CUTLASS_PRAGMA_UNROLL
                 for (int ni = 0; ni < size<1>(acc_reduction_view); ni++) {
-                    if (!(MaskMeanSlot && ni % 8 == 0)) {
+                    if (!skip_mean_slot(ni)) {
                         row_sum(mi) += acc_reduction_view(mi, ni);
                     }
                 }
@@ -121,7 +129,7 @@ struct SoftmaxFused{
                 CUTLASS_PRAGMA_UNROLL
                 for (int ni = 0; ni < size<1>(acc_reduction_view); ni++) {
                     acc_reduction_view(mi, ni) = flash::ptx_exp2(acc_reduction_view(mi, ni) * softmax_scale_log2 - max_scaled);
-                    if (!(MaskMeanSlot && ni % 8 == 0)) {
+                    if (!skip_mean_slot(ni)) {
                         row_sum(mi) += acc_reduction_view(mi, ni);
                     }
                 }

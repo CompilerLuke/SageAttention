@@ -1,0 +1,88 @@
+{
+  "L16": {
+    "eval_ranges": [
+      [
+        3851,
+        3925
+      ],
+      [
+        3879,
+        3953
+      ],
+      [
+        3961,
+        4036
+      ]
+    ],
+    "kv_seqs": [
+      3851,
+      3879,
+      3961
+    ],
+    "metrics": {
+      "s4_per_block_false": {
+        "one_minus_cos": {
+          "mean": 0.007401865907013416,
+          "q95": 0.037535799046357475
+        },
+        "rmse": {
+          "mean": 0.00801646818096439,
+          "q95": 0.020950182030598324
+        }
+      }
+    },
+    "q_seqs": [
+      3925,
+      3953,
+      4036
+    ],
+    "sources": [
+      "clear_question_logistics.txt",
+      "clear_question_clinic.txt",
+      "clear_question_observatory.txt"
+    ]
+  },
+  "L30": {
+    "eval_ranges": [
+      [
+        3851,
+        3925
+      ],
+      [
+        3879,
+        3953
+      ],
+      [
+        3961,
+        4036
+      ]
+    ],
+    "kv_seqs": [
+      3851,
+      3879,
+      3961
+    ],
+    "metrics": {
+      "s4_per_block_false": {
+        "one_minus_cos": {
+          "mean": 0.006455312793453534,
+          "q95": 0.025791903336842854
+        },
+        "rmse": {
+          "mean": 0.01272940170019865,
+          "q95": 0.028429896881182987
+        }
+      }
+    },
+    "q_seqs": [
+      3925,
+      3953,
+      4036
+    ],
+    "sources": [
+      "clear_question_logistics.txt",
+      "clear_question_clinic.txt",
+      "clear_question_observatory.txt"
+    ]
+  }
+}

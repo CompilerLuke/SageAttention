@@ -273,7 +273,7 @@ struct Mainloop {
 
     CUTE_HOST_DEVICE
     static int packed_key_to_logical_token(int packed_key_pos) {
-        static_assert(QUANT_BLOCK_SIZE == 8);
+        static_assert(QUANT_BLOCK_SIZE == 8 || QUANT_BLOCK_SIZE == 16);
         constexpr int kLogicalTokensPerPack = QUANT_BLOCK_SIZE - 1;
         int const group = packed_key_pos / QUANT_BLOCK_SIZE;
         int const lane = packed_key_pos - group * QUANT_BLOCK_SIZE;
@@ -283,7 +283,7 @@ struct Mainloop {
 
     CUTE_HOST_DEVICE
     static int packed_len_to_logical_len(int packed_len) {
-        static_assert(QUANT_BLOCK_SIZE == 8);
+        static_assert(QUANT_BLOCK_SIZE == 8 || QUANT_BLOCK_SIZE == 16);
         constexpr int kLogicalTokensPerPack = QUANT_BLOCK_SIZE - 1;
         int const full_groups = packed_len / QUANT_BLOCK_SIZE;
         int const remainder = packed_len - full_groups * QUANT_BLOCK_SIZE;
@@ -293,7 +293,7 @@ struct Mainloop {
 
     CUTE_HOST_DEVICE
     static int logical_len_to_packed_len(int logical_len) {
-        static_assert(QUANT_BLOCK_SIZE == 8);
+        static_assert(QUANT_BLOCK_SIZE == 8 || QUANT_BLOCK_SIZE == 16);
         constexpr int kLogicalTokensPerPack = QUANT_BLOCK_SIZE - 1;
         if (logical_len <= 0) {
             return 0;
@@ -809,10 +809,14 @@ struct Mainloop {
                 auto& a2 = acc_float4(make_coord(make_coord(_0{}, _1{}), _0{}), _0{}, i);
                 auto& a3 = acc_float4(make_coord(make_coord(_0{}, _1{}), _1{}), _0{}, i);
 
-                static_assert(QUANT_BLOCK_SIZE == 8);
-
-                const float mean0 = a0.x;
-                const float mean1 = a1.x;
+                float mean0 = a0.x;
+                float mean1 = a1.x;
+                if constexpr (QUANT_BLOCK_SIZE == 16) {
+                    mean0 = __shfl_sync(uint32_t(-1), mean0, 0, 2);
+                    mean1 = __shfl_sync(uint32_t(-1), mean1, 0, 2);
+                } else {
+                    static_assert(QUANT_BLOCK_SIZE == 8);
+                }
 
                 a0 = elem_op(a0, mean0, lamb_k_0);
                 a1 = elem_op(a1, mean1, lamb_k_0);
@@ -849,17 +853,20 @@ struct Mainloop {
 
             CUTLASS_PRAGMA_UNROLL
             for (int i = 0; i < 4; i++) {
-                int const num = quad_id + i * 8;
-                int const packed_key_pos0 = 4 * num;
                 auto& a0 = acc_float4(make_coord(make_coord(_0{}, _0{}), _0{}), _0{}, i);
                 auto& a1 = acc_float4(make_coord(make_coord(_0{}, _0{}), _1{}), _0{}, i);
 
-                if constexpr (BlockMean) {
-                    a0.x = -INFINITY;
-                    a1.x = -INFINITY;
-                } else {
-                    a0.x = can_use_mean_slot(query_pos0, packed_key_pos0) ? a0.y : -INFINITY;
-                    a1.x = can_use_mean_slot(query_pos1, packed_key_pos0) ? a1.y : -INFINITY;
+                bool const owns_mean_slot = QUANT_BLOCK_SIZE == 8 || (thread_idx & 1) == 0;
+                if (owns_mean_slot) {
+                    if constexpr (BlockMean) {
+                        a0.x = -INFINITY;
+                        a1.x = -INFINITY;
+                    } else {
+                        int const num = quad_id + i * 8;
+                        int const packed_key_pos0 = 4 * num;
+                        a0.x = can_use_mean_slot(query_pos0, packed_key_pos0) ? a0.y : -INFINITY;
+                        a1.x = can_use_mean_slot(query_pos1, packed_key_pos0) ? a1.y : -INFINITY;
+                    }
                 }
             }
         };
@@ -987,7 +994,7 @@ struct Mainloop {
             }
         };
 
-        softmax_fused.template online_softmax_with_quant</*Is_first=*/true, /*InfCheck=*/false, /*MaskMeanSlot=*/true>(
+        softmax_fused.template online_softmax_with_quant</*Is_first=*/true, /*InfCheck=*/false, /*MeanSlotLanePeriod=*/(BlockMean ? 0 : QUANT_BLOCK_SIZE / 8)>(
             tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
 
         consumer_wait(pipeline_v, smem_pipe_read_v);
@@ -1007,7 +1014,8 @@ struct Mainloop {
         }
         
         n_block--;
-        constexpr int n_masking_steps = !Is_causal ? 1 : cute::ceil_div(kBlockM * QUANT_BLOCK_SIZE, kBlockN * (QUANT_BLOCK_SIZE - 1)) + 1;
+        constexpr int n_masking_steps = !Is_causal ? 1 :
+            cute::ceil_div(kBlockM * QUANT_BLOCK_SIZE, kBlockN * (QUANT_BLOCK_SIZE - 1)) + (QUANT_BLOCK_SIZE == 16 ? 0 : 1);
         // // Only go through these if Is_causal, since n_masking_steps = 1 when !Is_causal
         CUTLASS_PRAGMA_UNROLL
         for (int masking_step = 0; masking_step < n_masking_steps - 1 && n_block >= 0; ++masking_step, --n_block) {
@@ -1029,7 +1037,7 @@ struct Mainloop {
             ++smem_pipe_read_k;
             mask_scores(tSrS, n_block);
             set_mean_slot_to_first_score(tSrS, n_block);
-            softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MaskMeanSlot=*/true>(
+            softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MeanSlotLanePeriod=*/(BlockMean ? 0 : QUANT_BLOCK_SIZE / 8)>(
                 tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
             Tensor tOrO = make_fragment_like(tOrO_store);
             consumer_wait(pipeline_v, smem_pipe_read_v);
@@ -1068,9 +1076,11 @@ struct Mainloop {
                     ++smem_pipe_read_k;
                 }
             }
-            mask_scores(tSrS, n_block);
+            if constexpr (!Is_causal) {
+                mask_scores(tSrS, n_block);
+            }
             set_mean_slot_to_first_score(tSrS, n_block);
-            softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MaskMeanSlot=*/true>(
+            softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MeanSlotLanePeriod=*/(BlockMean ? 0 : QUANT_BLOCK_SIZE / 8)>(
                 tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
             Tensor tOrO = make_fragment_like(tOrO_store);
             consumer_wait(pipeline_v, smem_pipe_read_v);

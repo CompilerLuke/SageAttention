@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "batch": 1,
+    "heads": 4,
+    "head_dim": 128,
+    "seq_lengths": [
+      4096,
+      8192,
+      16384
+    ],
+    "kernels": [
+      "flash",
+      "sageattn3",
+      "sageattn4"
+    ],
+    "causal": false,
+    "per_block_mean": true,
+    "v_trick": false,
+    "warmup": 8,
+    "repeats": 8,
+    "flops_convention": "dense attention FLOPs"
+  },
+  "results": [
+    {
+      "seq_len": 4096,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 0.19421599991619587,
+      "median_ms": 0.19036799669265747,
+      "tokens_per_s": 86064886.34983853,
+      "tflops": 180.49114853833655,
+      "io_gb_s": 66.09783271667598,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 4096,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 0.07375200092792511,
+      "median_ms": 0.07231999933719635,
+      "tokens_per_s": 226548674.6426616,
+      "tflops": 475.10700612420715,
+      "io_gb_s": 173.9893821255641,
+      "relative_to_flash": 2.6323008633483975
+    },
+    {
+      "seq_len": 4096,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 0.0812679985538125,
+      "median_ms": 0.08169599995017052,
+      "tokens_per_s": 200548374.58374,
+      "tflops": 420.5804248550395,
+      "io_gb_s": 154.02115168031233,
+      "relative_to_flash": 2.33019972592012
+    },
+    {
+      "seq_len": 8192,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 0.5496239960193634,
+      "median_ms": 0.5485279858112335,
+      "tokens_per_s": 59738064.14186595,
+      "tflops": 250.5596013824849,
+      "io_gb_s": 45.87883326095305,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 8192,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 0.22975200414657593,
+      "median_ms": 0.22990400344133377,
+      "tokens_per_s": 142529053.47236216,
+      "tflops": 597.8101790953426,
+      "io_gb_s": 109.46231306677416,
+      "relative_to_flash": 2.3859001043938117
+    },
+    {
+      "seq_len": 8192,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 0.26475200429558754,
+      "median_ms": 0.26044800877571106,
+      "tokens_per_s": 125813977.82241708,
+      "tflops": 527.7020704364753,
+      "io_gb_s": 96.62513496761632,
+      "relative_to_flash": 2.1060939893136488
+    },
+    {
+      "seq_len": 16384,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 1.5678719878196716,
+      "median_ms": 1.5641760230064392,
+      "tokens_per_s": 41898097.807455145,
+      "tflops": 351.4667184524007,
+      "io_gb_s": 32.17773911612555,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 16384,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 0.7692800015211105,
+      "median_ms": 0.7692959904670715,
+      "tokens_per_s": 85189576.97961012,
+      "tflops": 714.6219669677733,
+      "io_gb_s": 65.42559512034057,
+      "relative_to_flash": 2.033256434960441
+    },
+    {
+      "seq_len": 16384,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 0.904679998755455,
+      "median_ms": 0.904911994934082,
+      "tokens_per_s": 72422512.20769148,
+      "tflops": 607.5240652855384,
+      "io_gb_s": 55.62048937550705,
+      "relative_to_flash": 1.7285393847833581
+    }
+  ]
+}

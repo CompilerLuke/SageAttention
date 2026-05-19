@@ -1,0 +1,169 @@
+{
+  "metadata": {
+    "base_batch": 16,
+    "base_heads": 4,
+    "head_dim": 128,
+    "seq_lengths": [
+      16384,
+      32768,
+      65536
+    ],
+    "scale_batch": true,
+    "shapes": [
+      {
+        "seq_len": 16384,
+        "batch": 16,
+        "heads": 4
+      },
+      {
+        "seq_len": 32768,
+        "batch": 4,
+        "heads": 4
+      },
+      {
+        "seq_len": 65536,
+        "batch": 1,
+        "heads": 4
+      }
+    ],
+    "kernels": [
+      "flash",
+      "sageattn3",
+      "sageattn4"
+    ],
+    "causal": false,
+    "per_block_mean": true,
+    "v_trick": false,
+    "warmup": 8,
+    "repeats": 8,
+    "flops_convention": "dense attention FLOPs"
+  },
+  "results": [
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 30.4555561542511,
+      "median_ms": 30.614255905151367,
+      "tokens_per_s": 34251232.60381316,
+      "tflops": 287.3201638302079,
+      "io_gb_s": 26.304946639728506,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 11.57367205619812,
+      "median_ms": 11.986656188964844,
+      "tokens_per_s": 87478608.16808446,
+      "tflops": 733.8237523076587,
+      "io_gb_s": 67.18357107308886,
+      "relative_to_flash": 2.554028031048014
+    },
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 14.9721440076828,
+      "median_ms": 15.092912197113037,
+      "tokens_per_s": 69474730.01271226,
+      "tflops": 582.7962759824782,
+      "io_gb_s": 53.35659264976301,
+      "relative_to_flash": 2.028386272001718
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 30.628811836242676,
+      "median_ms": 30.64575958251953,
+      "tokens_per_s": 17108011.25970642,
+      "tflops": 287.0248002345267,
+      "io_gb_s": 13.13895264745453,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 12.10123610496521,
+      "median_ms": 12.17087984085083,
+      "tokens_per_s": 43077247.237316296,
+      "tflops": 722.7162815858587,
+      "io_gb_s": 33.08332587825892,
+      "relative_to_flash": 2.5179576154929135
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 15.03433609008789,
+      "median_ms": 15.042960166931152,
+      "tokens_per_s": 34852714.77036409,
+      "tflops": 584.7315238887887,
+      "io_gb_s": 26.76688494363962,
+      "relative_to_flash": 2.0372160294546227
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 30.582103967666626,
+      "median_ms": 30.6135196685791,
+      "tokens_per_s": 8563014.081293553,
+      "tflops": 287.32707370580704,
+      "io_gb_s": 6.576394814433449,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 12.230008125305176,
+      "median_ms": 12.248400211334229,
+      "tokens_per_s": 21402305.23798703,
+      "tflops": 718.1421957512797,
+      "io_gb_s": 16.43697042277404,
+      "relative_to_flash": 2.4993892378084164
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 4,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 15.163820028305054,
+      "median_ms": 15.185455799102783,
+      "tokens_per_s": 17262833.823894076,
+      "tflops": 579.2445836711538,
+      "io_gb_s": 13.257856376750652,
+      "relative_to_flash": 2.0159763443115
+    }
+  ]
+}

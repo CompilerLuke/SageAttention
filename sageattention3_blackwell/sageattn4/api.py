@@ -247,8 +247,8 @@ def last_fwd_used_specialized() -> bool:
     return fp4attn4_cuda.last_fwd_used_specialized()
 
 
-def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, quant_block = 8, v_trick: bool | None = None, **kwargs):
-    assert quant_block in [8]
+def sageattn4_blackwell(q, k, v, attn_mask = None, is_causal = False, per_block_mean = True, quant_block = 16, v_trick: bool | None = None, **kwargs):
+    assert quant_block in [16]
 
     if q.size(-1) >= 256:
         print(f"Unsupported Headdim {q.size(-1)}")
