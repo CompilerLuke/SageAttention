@@ -39,7 +39,6 @@ namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0 {
     static constexpr bool kIsCausal = false;
     static constexpr int kNWarps = 12;
     static constexpr int kNThreads = kNWarps * cutlass::NumThreadsPerWarp;
-    static constexpr int kEpiStages = 1;
     static constexpr int kNumSFQK = kHeadDim / 16;
     static constexpr int kNumSFPV = kBlockN / 16;
     static constexpr int kSFVectorSize = 16;
@@ -264,7 +263,6 @@ namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0 {
     );
     using SharedStorage = ::SharedStorageQKVOwithSF<
         kStages,
-        kEpiStages,
         cutlass::float_e2m1_t,
         cutlass::float_ue4m3_t,
         cutlass::bfloat16_t,
@@ -282,7 +280,6 @@ namespace flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean0 {
     using MainloopPipelineQ = cutlass::PipelineTmaAsync<1>;
     using PipelineParamsQ = MainloopPipelineQ::Params;
     using PipelineStateQ = cutlass::PipelineState<1>;
-    using EpilogueBarrier = flash::OrderedSequenceBarrierVarGroupSize<kEpiStages, 2>;
 
     template <class ProblemShape>
     CUTE_HOST_DEVICE constexpr auto

@@ -69,12 +69,6 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
         Consumer0 = 1,
         Consumer1 = 2
     };
-    enum class ProducerWarpRole {
-        Mainloop = 0,
-        Epilogue = 1,
-        Warp2 = 2,
-        Warp3 = 3
-    };
 
     extern __shared__ char shared_memory[];
     auto &shared_storage = *reinterpret_cast<SharedStorage*>(shared_memory);
@@ -85,7 +79,7 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
     int const warp_group_thread_idx = threadIdx.x % cutlass::NumThreadsPerWarpGroup;
     int warp_idx_in_warp_group = warp_idx % cutlass::NumWarpsPerWarpGroup;
     auto warp_group_role = WarpGroupRole(warp_group_idx);
-    auto producer_warp_role = ProducerWarpRole(warp_idx_in_warp_group);
+    bool const is_mainloop_producer_warp = warp_idx_in_warp_group == 0;
 
     // Issue Tma Descriptor Prefetch from a single thread
     if (warp_idx == 0 && lane_predicate) {
@@ -124,12 +118,6 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
     MainloopPipeline pipeline_k(shared_storage.pipeline_k, pipeline_params_k, ClusterShape{});
     MainloopPipeline pipeline_v(shared_storage.pipeline_v, pipeline_params_v, ClusterShape{});
 
-    uint32_t epilogue_barrier_group_size_list[2] = {cutlass::NumThreadsPerWarp, NumMmaThreads};
-    typename EpilogueBarrier::Params params_epilogue_barrier;
-    params_epilogue_barrier.group_id = (warp_group_role == WarpGroupRole::Producer);
-    params_epilogue_barrier.group_size_list = epilogue_barrier_group_size_list;
-    EpilogueBarrier barrier_o(shared_storage.barrier_o, params_epilogue_barrier);
-
     CollectiveMainloop collective_mainloop;
     CollectiveEpilogue collective_epilogue;
     __syncthreads();
@@ -146,14 +134,14 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
             auto block_coord = work_tile_info.get_block_coord(scheduler_params);
             int n_block_max = collective_mainloop.get_n_block_max(mainloop_params, get<0>(block_coord));
 
-            if (producer_warp_role == ProducerWarpRole::Mainloop) {
+            if (is_mainloop_producer_warp) {
                 collective_mainloop.load_q(mainloop_params, scheduler_params,
                                            pipeline_q, smem_pipe_write_q,
                                            shared_storage, work_tile_info);
             }
             cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopQLoaded));
 
-            if (producer_warp_role == ProducerWarpRole::Mainloop) {
+            if (is_mainloop_producer_warp) {
                 collective_mainloop.load_kv(mainloop_params, scheduler_params,
                                             pipeline_k, pipeline_v,
                                             smem_pipe_write_k, smem_pipe_write_v,
@@ -161,16 +149,14 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
             }
             cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopMmaDone));
 
-            if (producer_warp_role == ProducerWarpRole::Epilogue && n_block_max > 0) {
-                barrier_o.wait();
-                collective_epilogue.tma_store(shared_storage, epilogue_params, work_tile_info, scheduler_params, threadIdx.x);
-                collective_epilogue.store_tail();
-                barrier_o.arrive();
+            cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopOReady));
+            if (is_mainloop_producer_warp && n_block_max > 0) {
+                collective_epilogue.tma_store(shared_storage, epilogue_params, work_tile_info, scheduler_params);
             }
             cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopEpilogueDone));
         }
 
-        if (producer_warp_role == ProducerWarpRole::Mainloop) {
+        if (is_mainloop_producer_warp) {
             collective_mainloop.load_tail(pipeline_q, pipeline_k, pipeline_v, 
                                           smem_pipe_write_q, smem_pipe_write_k, smem_pipe_write_v);
         }
@@ -197,6 +183,7 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
                 cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopQLoaded));
                 cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopMmaDone));
                 collective_epilogue.store_zero(epilogue_params, threadIdx.x - NumCopyThreads, block_coord);
+                cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopOReady));
                 cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopEpilogueDone));
                 continue;
             }
@@ -204,10 +191,8 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
             collective_mainloop.mma(mainloop_params, pipeline_q, pipeline_k, pipeline_v,
                                     smem_pipe_read_q, smem_pipe_read_k, smem_pipe_read_v,
                                     tOrO, softmax_fused, n_block_max, threadIdx.x - NumCopyThreads, work_idx, m_block, shared_storage);
-            barrier_o.wait();
             collective_epilogue.mma_store(shared_storage, tiled_mma_pv, tOrO, threadIdx.x - NumCopyThreads); 
-            barrier_o.arrive();
-            barrier_o.wait();
+            cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopOReady));
             cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopEpilogueDone));
             ++work_idx;
         }
@@ -293,7 +278,12 @@ void SAGEATTN4_FWD_RUN(Flash_fwd_params &params, cudaStream_t stream) {
     static constexpr int ctaSize = kNWarps * 32;
     params.m_block_divmod = cutlass::FastDivmod(num_blocks_m);
     params.total_blocks = num_blocks_m * params.h * params.b;
-    dim3 grid_dims = Scheduler::get_grid_dim(scheduler_args, 170);
+    int const num_sm = at::cuda::getCurrentDeviceProperties()->multiProcessorCount;
+    int const ctas_per_sm = smem_size <= 64 * 1024 ? 2 : 1;
+    int const persistent_ctas = params.total_blocks < num_sm * ctas_per_sm
+        ? params.total_blocks
+        : num_sm * ctas_per_sm;
+    dim3 grid_dims = Scheduler::get_grid_dim(scheduler_args, persistent_ctas);
     dim3 block_dims(ctaSize);
     dim3 cluster_dims(size<0>(ClusterShape_MNK{}), size<1>(ClusterShape_MNK{}), size<2>(ClusterShape_MNK{}));
     cutlass::ClusterLaunchParams launch_params{grid_dims, block_dims, cluster_dims, smem_size, stream};

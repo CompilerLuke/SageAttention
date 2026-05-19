@@ -23,12 +23,14 @@ import sageattn4.api as s4
 
 KERNEL_LABELS = {
     "flash": "Flash SDPA",
+    "flash_fp16": "Flash SDPA FP16",
     "sageattn3": "SageAttention3",
     "sageattn4": "SageAttention4",
 }
 
 KERNEL_COLORS = {
     "flash": "#4c78a8",
+    "flash_fp16": "#4c78a8",
     "sageattn3": "#f58518",
     "sageattn4": "#54a24b",
 }
@@ -174,6 +176,11 @@ def make_kernel_fn(
 ):
     if kernel == "flash":
         return lambda: F.scaled_dot_product_attention(q, k, v, is_causal=is_causal)
+    if kernel == "flash_fp16":
+        q_fp16 = q.to(torch.float16)
+        k_fp16 = k.to(torch.float16)
+        v_fp16 = v.to(torch.float16)
+        return lambda: F.scaled_dot_product_attention(q_fp16, k_fp16, v_fp16, is_causal=is_causal)
     if kernel == "sageattn3":
         return bench_sageattention3_kernel_only(q, k, v, per_block_mean=per_block_mean, is_causal=is_causal)
     if kernel == "sageattn4":
@@ -251,8 +258,11 @@ def run_benchmarks(args: argparse.Namespace) -> list[dict]:
 
 
 def add_flash_relative_throughput(results: list[dict]) -> None:
+    baseline_kernel = "flash" if any(row["kernel"] == "flash" for row in results) else "flash_fp16"
     flash_by_shape = {
-        (row["seq_len"], row["batch"], row["heads"]): row["tflops"] for row in results if row["kernel"] == "flash"
+        (row["seq_len"], row["batch"], row["heads"]): row["tflops"]
+        for row in results
+        if row["kernel"] == baseline_kernel
     }
     for row in results:
         flash_tflops = flash_by_shape.get((row["seq_len"], row["batch"], row["heads"]))

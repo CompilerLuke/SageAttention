@@ -19,7 +19,6 @@
 #include "cute/tensor.hpp"
 
 #include "cutlass/gemm/collective/collective_builder.hpp"
-#include "named_barrier.h"
 #include "utils.h"
 #include "fwd_config.h"
 #include SAGEATTN4_FWD_SPECIALIZATION_HEADER
@@ -129,8 +128,7 @@ struct Epilogue {
         SharedStorage& shared_storage,
         Params const& epilogue_params,
         WorkTileInfo work_tile_info,
-        SchedulerParams const& scheduler_params,
-        int thread_idx
+        SchedulerParams const& scheduler_params
     ) {
         auto [m_block, bidh, bidb] = work_tile_info.get_block_coord(scheduler_params);
         Tensor sO = cute::as_position_independent_swizzle_tensor(make_tensor(make_smem_ptr(shared_storage.smem_o.begin()), SmemLayoutO{}));
@@ -140,42 +138,12 @@ struct Epilogue {
         Tensor tOgO = block_tma_O.partition_D(gO);  // (TMA, TMA_M, TMA_K)
         Tensor tOsO = block_tma_O.partition_S(sO); // (TMA, TMA_M, TMA_K)
 
-        // auto shape_LSE = select<0, 2, 3>(epilogue_params.shape_O);
-        // Tensor mLSE = make_tensor(make_gmem_ptr(epilogue_params.ptr_LSE), shape_LSE, epilogue_params.stride_LSE);
-        // Tensor gLSE = local_tile(mLSE(_, bidh, bidb), Shape<Int<kBlockM>>{}, make_coord(m_block));
-
-        // Tensor caccO = cute::make_identity_tensor(select<0, 2>(TileShape_MNK{}));
-        // auto thread_mma = tiled_mma.get_thread_slice(thread_idx);
-        // Tensor taccOcO = thread_mma.partition_C(caccO);                           // (MMA,MMA_M,MMA_K)
-        // static_assert(decltype(size<0, 0>(taccOcO))::value == 2);
-        // static_assert(decltype(size<0, 1>(taccOcO))::value == 2);
-        // // // // taccOcO has shape ((2, 2, V), MMA_M, MMA_K), we only take only the row indices.
-        // Tensor taccOcO_row = taccOcO(make_coord(_0{}, _), _, _0{});
-        // CUTE_STATIC_ASSERT_V(size(lse) == size(taccOcO_row));                     // MMA_M
-        // if (get<1>(taccOcO_row(_0{})) == 0) {
-        //     #pragma unroll
-        //     for (int mi = 0; mi < size(lse); ++mi) {
-        //         const int row = get<0>(taccOcO_row(mi));
-        //         if (row < get<0>(shape_LSE) - m_block * kBlockM) { gLSE(row) = lse(mi); }
-        //     }
-        // }
-
-        // if (cutlass::canonical_warp_idx_sync() == kNWarps - 1) {
-        //     cutlass::arch::NamedBarrier::sync(NumMmaThreads + cutlass::NumThreadsPerWarp,
-        //                         static_cast<uint32_t>(FP4NamedBarriers::EpilogueBarrier));
-        //     int const lane_predicate = cute::elect_one_sync();
-        //     if (lane_predicate) {
-        //         cute::copy(epilogue_params.tma_store_O, tOsO, tOgO);
-        //         tma_store_arrive();
-        //     }
-        // }
-        cute::copy(epilogue_params.tma_store_O, tOsO, tOgO);
-        tma_store_arrive();
-    }
-
-    CUTLASS_DEVICE void
-    store_tail() {
-        tma_store_wait<0>();
+        int const lane_predicate = cute::elect_one_sync();
+        if (lane_predicate) {
+            cute::copy(epilogue_params.tma_store_O, tOsO, tOgO);
+            tma_store_arrive();
+            tma_store_wait<0>();
+        }
     }
 
     // Write 0 to output and -inf to LSE
