@@ -1,0 +1,35 @@
+{
+  "note": "Scaled-shape S4 comparison against reports/bench_full_alias_smem_sageattn4_scaled.json. Current values were rerun as separate one-shape processes.",
+  "old_source_json": "reports/bench_full_alias_smem_sageattn4_scaled.json",
+  "current_source_jsons": [
+    "reports/bench_current_vs_full_alias_s4_16k_b16h4.json",
+    "reports/bench_current_vs_full_alias_s4_32k_b4h4.json",
+    "reports/bench_current_vs_full_alias_s4_64k_b1h4.json"
+  ],
+  "summary": [
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 4,
+      "old_full_alias_s4_tflops": 771.3359309589591,
+      "current_s4_tflops": 760.8613494688149,
+      "delta_percent": -1.3579791981324862
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 4,
+      "old_full_alias_s4_tflops": 702.2976562688046,
+      "current_s4_tflops": 703.1636044189016,
+      "delta_percent": 0.12330215576934478
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 4,
+      "old_full_alias_s4_tflops": 660.8023417992655,
+      "current_s4_tflops": 691.349776709309,
+      "delta_percent": 4.622779457298454
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+==WARNING== No metrics to collect found in sections.
+==PROF== Connected to process 3214895 (/venv/main/bin/python3.12)
+benchmarking seq=65536 batch=1 heads=4 kernel=sageattn4
+==PROF== Profiling "void flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal::compute_attn_ws<flash::StaticPersistentTileScheduler>(Flash_fwd_params, flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal::Mainloop::Params, flash::generated::sageattn4_fwd_hdim128_bm128_bn128_s3_blockmean1_causal::Epilogue::Params, T1::Params)": 0%....50%....100% - 1 pass
+  median=6.718 ms tflops=654.62 tokens/s=39018628
+   seq    B    H  kernel            median ms     TFLOP/s   vs flash
+--------------------------------------------------------------------
+   64k    1    4  SageAttention4        6.718      654.62        n/a
+reports/aux/ncu_probe_b1_plot.png
+reports/aux/ncu_probe_b1.json
+==PROF== Disconnected from process 3214895
+[3214895] python3.12@127.0.0.1
+  void compute_attn_ws<StaticPersistentTileScheduler>(Flash_fwd_params, Params, Params, Params) (170, 1, 1)x(384, 1, 1), Context 1, Stream 7, Device 0, CC 12.0

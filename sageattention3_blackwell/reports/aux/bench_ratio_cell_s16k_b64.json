@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "base_batch": 64,
+    "base_heads": 16,
+    "head_dim": 128,
+    "seq_lengths": [
+      16384
+    ],
+    "scale_batch": false,
+    "sageattn4_quant_block_size": 16,
+    "shapes": [
+      {
+        "seq_len": 16384,
+        "batch": 64,
+        "heads": 16
+      }
+    ],
+    "kernels": [
+      "sageattn3",
+      "sageattn4"
+    ],
+    "causal": true,
+    "per_block_mean": true,
+    "v_trick": false,
+    "warmup": 8,
+    "repeats": 8,
+    "flops_convention": "causal uses half of dense attention FLOPs"
+  },
+  "results": [
+    {
+      "seq_len": 16384,
+      "batch": 64,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 107.01826858520508,
+      "median_ms": 107.06280136108398,
+      "tokens_per_s": 156704436.89789638,
+      "tflops": 657.2660464985944,
+      "io_gb_s": 120.34900753758443,
+      "relative_to_flash": null
+    },
+    {
+      "seq_len": 16384,
+      "batch": 64,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 118.83342456817627,
+      "median_ms": 118.85940933227539,
+      "tokens_per_s": 141151769.9292846,
+      "tflops": 592.0334332214782,
+      "io_gb_s": 108.40455930569058,
+      "relative_to_flash": null
+    }
+  ]
+}

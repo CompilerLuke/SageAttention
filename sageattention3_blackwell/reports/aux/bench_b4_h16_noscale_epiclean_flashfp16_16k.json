@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "base_batch": 4,
+    "base_heads": 16,
+    "head_dim": 128,
+    "seq_lengths": [
+      16384
+    ],
+    "scale_batch": false,
+    "sageattn4_quant_block_size": 16,
+    "shapes": [
+      {
+        "seq_len": 16384,
+        "batch": 4,
+        "heads": 16
+      }
+    ],
+    "kernels": [
+      "flash_fp16"
+    ],
+    "causal": true,
+    "per_block_mean": true,
+    "v_trick": false,
+    "warmup": 8,
+    "repeats": 8,
+    "flops_convention": "causal uses half of dense attention FLOPs"
+  },
+  "results": [
+    {
+      "seq_len": 16384,
+      "batch": 4,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "flash_fp16",
+      "label": "Flash SDPA FP16",
+      "mean_ms": 15.118987798690796,
+      "median_ms": 15.159087657928467,
+      "tokens_per_s": 69171445.1200219,
+      "tflops": 290.1260689526883,
+      "io_gb_s": 53.12366985217681,
+      "relative_to_flash": 1.0
+    }
+  ]
+}

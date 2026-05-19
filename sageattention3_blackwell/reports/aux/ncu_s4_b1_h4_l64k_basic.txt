@@ -1,0 +1,10 @@
+==PROF== Connected to process 3215248 (/venv/main/bin/python3.12)
+benchmarking seq=65536 batch=1 heads=4 kernel=sageattn4
+==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU Performance Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM
+  median=6.903 ms tflops=637.16 tokens/s=37977792
+   seq    B    H  kernel            median ms     TFLOP/s   vs flash
+--------------------------------------------------------------------
+   64k    1    4  SageAttention4        6.903      637.16        n/a
+reports/aux/ncu_probe_b1_plot.png
+reports/aux/ncu_probe_b1.json
+==PROF== Disconnected from process 3215248
