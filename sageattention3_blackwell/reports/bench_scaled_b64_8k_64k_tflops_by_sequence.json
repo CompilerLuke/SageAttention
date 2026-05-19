@@ -1,0 +1,218 @@
+{
+  "metadata": {
+    "base_batch": 64,
+    "base_heads": 16,
+    "head_dim": 128,
+    "seq_lengths": [
+      8192,
+      16384,
+      32768,
+      65536
+    ],
+    "scale_batch": true,
+    "sageattn4_quant_block_size": 16,
+    "shapes": [
+      {
+        "seq_len": 8192,
+        "batch": 64,
+        "heads": 16
+      },
+      {
+        "seq_len": 16384,
+        "batch": 16,
+        "heads": 16
+      },
+      {
+        "seq_len": 32768,
+        "batch": 4,
+        "heads": 16
+      },
+      {
+        "seq_len": 65536,
+        "batch": 1,
+        "heads": 16
+      }
+    ],
+    "kernels": [
+      "flash",
+      "sageattn3",
+      "sageattn4"
+    ],
+    "causal": true,
+    "per_block_mean": true,
+    "v_trick": false,
+    "warmup": 8,
+    "repeats": 8,
+    "flops_convention": "causal uses half of dense attention FLOPs"
+  },
+  "results": [
+    {
+      "seq_len": 8192,
+      "batch": 64,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 63.41422367095947,
+      "median_ms": 63.43939208984375,
+      "tokens_per_s": 132230270.87207796,
+      "tflops": 277.3069770199201,
+      "io_gb_s": 101.55284802975589,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 8192,
+      "batch": 64,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 27.02761173248291,
+      "median_ms": 27.262271881103516,
+      "tokens_per_s": 307700254.6443847,
+      "tflops": 645.2942044279806,
+      "io_gb_s": 236.31379556688745,
+      "relative_to_flash": 2.3270031333601335
+    },
+    {
+      "seq_len": 8192,
+      "batch": 64,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 31.174736261367798,
+      "median_ms": 31.172592163085938,
+      "tokens_per_s": 269102035.40704095,
+      "tflops": 564.3478717579468,
+      "io_gb_s": 206.67036319260745,
+      "relative_to_flash": 2.0351015968754633
+    },
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 61.47418451309204,
+      "median_ms": 61.48620796203613,
+      "tokens_per_s": 68215363.07117392,
+      "tflops": 286.11597019087714,
+      "io_gb_s": 52.38939883866158,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 26.689600229263306,
+      "median_ms": 26.688079833984375,
+      "tokens_per_s": 157160201.3367409,
+      "tflops": 659.1776611074979,
+      "io_gb_s": 120.69903462661705,
+      "relative_to_flash": 2.303882795034962
+    },
+    {
+      "seq_len": 16384,
+      "batch": 16,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 29.501548051834106,
+      "median_ms": 29.48203182220459,
+      "tokens_per_s": 142266449.79200625,
+      "tflops": 596.708739428411,
+      "io_gb_s": 109.2606334402608,
+      "relative_to_flash": 2.085548524363486
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 60.52318096160889,
+      "median_ms": 60.541120529174805,
+      "tokens_per_s": 34640125.2845887,
+      "tflops": 290.58243208330305,
+      "io_gb_s": 26.603616218564117,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 26.937576055526733,
+      "median_ms": 26.93769645690918,
+      "tokens_per_s": 77851942.66164161,
+      "tflops": 653.0694290269882,
+      "io_gb_s": 59.79029196414076,
+      "relative_to_flash": 2.2474498005432375
+    },
+    {
+      "seq_len": 32768,
+      "batch": 4,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 29.17052412033081,
+      "median_ms": 29.194880485534668,
+      "tokens_per_s": 71832868.13039315,
+      "tflops": 602.577772261561,
+      "io_gb_s": 55.16764272414193,
+      "relative_to_flash": 2.0736896168892147
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "flash",
+      "label": "Flash SDPA",
+      "mean_ms": 60.27358055114746,
+      "median_ms": 60.294992446899414,
+      "tokens_per_s": 17390764.264933936,
+      "tflops": 291.76860847787793,
+      "io_gb_s": 13.356106955469263,
+      "relative_to_flash": 1.0
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn3",
+      "label": "SageAttention3",
+      "mean_ms": 28.880775928497314,
+      "median_ms": 28.888912200927734,
+      "tokens_per_s": 36296832.24854434,
+      "tflops": 608.9597947495943,
+      "io_gb_s": 27.875967166882056,
+      "relative_to_flash": 2.0871326697085917
+    },
+    {
+      "seq_len": 65536,
+      "batch": 1,
+      "heads": 16,
+      "head_dim": 128,
+      "kernel": "sageattn4",
+      "label": "SageAttention4",
+      "mean_ms": 30.465616464614868,
+      "median_ms": 30.50057601928711,
+      "tokens_per_s": 34378891.708042845,
+      "tflops": 576.7820920264437,
+      "io_gb_s": 26.402988831776902,
+      "relative_to_flash": 1.976847663754669
+    }
+  ]
+}

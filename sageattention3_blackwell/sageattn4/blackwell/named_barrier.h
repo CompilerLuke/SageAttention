@@ -27,7 +27,10 @@ enum class FP4NamedBarriers {
     WarpSpecializedPingPongConsumer2 = 4,
     ProducerEnd = 5,
     ConsumerEnd = 6,
-    EpilogueBarrier = 7
+    EpilogueBarrier = 7,
+    MainloopQLoaded = 8,
+    MainloopMmaDone = 9,
+    MainloopEpilogueDone = 10
 };
 
 template<int SequenceDepth, int SequenceLength>

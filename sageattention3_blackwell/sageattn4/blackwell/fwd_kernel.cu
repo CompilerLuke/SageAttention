@@ -137,30 +137,42 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
     if (warp_group_role == WarpGroupRole::Producer) {
         cutlass::arch::warpgroup_reg_dealloc<24>();
         TileScheduler scheduler;
-        
-        if (producer_warp_role == ProducerWarpRole::Mainloop) {  // Load Q, K, V
-            PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
-            PipelineState smem_pipe_write_k = cutlass::make_producer_start_state<MainloopPipeline>();
-            PipelineState smem_pipe_write_v = cutlass::make_producer_start_state<MainloopPipeline>();
-            
-        int work_idx = 0;
-            for (auto work_tile_info = scheduler.get_initial_work(); work_tile_info.is_valid(scheduler_params); work_tile_info = scheduler.get_next_work(scheduler_params, work_tile_info)) {
-                int tile_count_semaphore = 0;
-                collective_mainloop.load(mainloop_params, scheduler_params, 
-                                         pipeline_q, pipeline_k, pipeline_v, 
-                                         smem_pipe_write_q, smem_pipe_write_k, smem_pipe_write_v,
-                                         shared_storage, work_tile_info, work_idx, tile_count_semaphore);
+
+        PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
+        PipelineState smem_pipe_write_k = cutlass::make_producer_start_state<MainloopPipeline>();
+        PipelineState smem_pipe_write_v = cutlass::make_producer_start_state<MainloopPipeline>();
+
+        for (auto work_tile_info = scheduler.get_initial_work(); work_tile_info.is_valid(scheduler_params); work_tile_info = scheduler.get_next_work(scheduler_params, work_tile_info)) {
+            auto block_coord = work_tile_info.get_block_coord(scheduler_params);
+            int n_block_max = collective_mainloop.get_n_block_max(mainloop_params, get<0>(block_coord));
+
+            if (producer_warp_role == ProducerWarpRole::Mainloop) {
+                collective_mainloop.load_q(mainloop_params, scheduler_params,
+                                           pipeline_q, smem_pipe_write_q,
+                                           shared_storage, work_tile_info);
             }
-            collective_mainloop.load_tail(pipeline_q, pipeline_k, pipeline_v, 
-                                          smem_pipe_write_q, smem_pipe_write_k, smem_pipe_write_v);
-        } else if (producer_warp_role == ProducerWarpRole::Epilogue) {
-            for (auto work_tile_info = scheduler.get_initial_work(); work_tile_info.is_valid(scheduler_params); work_tile_info = scheduler.get_next_work(scheduler_params, work_tile_info)) {
+            cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopQLoaded));
+
+            if (producer_warp_role == ProducerWarpRole::Mainloop) {
+                collective_mainloop.load_kv(mainloop_params, scheduler_params,
+                                            pipeline_k, pipeline_v,
+                                            smem_pipe_write_k, smem_pipe_write_v,
+                                            shared_storage, work_tile_info);
+            }
+            cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopMmaDone));
+
+            if (producer_warp_role == ProducerWarpRole::Epilogue && n_block_max > 0) {
                 barrier_o.wait();
                 collective_epilogue.tma_store(shared_storage, epilogue_params, work_tile_info, scheduler_params, threadIdx.x);
                 collective_epilogue.store_tail();
                 barrier_o.arrive();
             }
-            
+            cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopEpilogueDone));
+        }
+
+        if (producer_warp_role == ProducerWarpRole::Mainloop) {
+            collective_mainloop.load_tail(pipeline_q, pipeline_k, pipeline_v, 
+                                          smem_pipe_write_q, smem_pipe_write_k, smem_pipe_write_v);
         }
     } else if (warp_group_role == WarpGroupRole::Consumer0 || warp_group_role == WarpGroupRole::Consumer1) {
         cutlass::arch::warpgroup_reg_alloc<232>();
@@ -182,15 +194,21 @@ __global__ void __launch_bounds__(kNWarps * cutlass::NumThreadsPerWarp, 1)
 
             int n_block_max = collective_mainloop.get_n_block_max(mainloop_params, m_block);
             if (Is_causal && n_block_max <= 0) {  // We exit early and write 0 to gO and -inf to gLSE.
+                cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopQLoaded));
+                cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopMmaDone));
                 collective_epilogue.store_zero(epilogue_params, threadIdx.x - NumCopyThreads, block_coord);
+                cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopEpilogueDone));
                 continue;
             }
 
-            collective_mainloop.mma(mainloop_params, pipeline_q, pipeline_k, pipeline_v, smem_pipe_read_q, smem_pipe_read_k, smem_pipe_read_v,
+            collective_mainloop.mma(mainloop_params, pipeline_q, pipeline_k, pipeline_v,
+                                    smem_pipe_read_q, smem_pipe_read_k, smem_pipe_read_v,
                                     tOrO, softmax_fused, n_block_max, threadIdx.x - NumCopyThreads, work_idx, m_block, shared_storage);
             barrier_o.wait();
             collective_epilogue.mma_store(shared_storage, tiled_mma_pv, tOrO, threadIdx.x - NumCopyThreads); 
             barrier_o.arrive();
+            barrier_o.wait();
+            cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopEpilogueDone));
             ++work_idx;
         }
     }

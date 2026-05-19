@@ -53,6 +53,15 @@ struct SoftmaxFused{
                 return (ni % 8 == 0) && ((threadIdx.x & (MeanSlotLanePeriod - 1)) == 0);
             }
         };
+        auto accumulate_row_sum = [&](int mi, int ni) {
+            if constexpr (MeanSlotLanePeriod == 0) {
+                row_sum(mi) += acc_reduction_view(mi, ni);
+            } else {
+                if (!skip_mean_slot(ni)) {
+                    row_sum(mi) += acc_reduction_view(mi, ni);
+                }
+            }
+        };
         
         if constexpr (FirstTile) {
             fill(row_max, -INFINITY);
@@ -91,9 +100,7 @@ struct SoftmaxFused{
             for (int mi = 0; mi < size<0>(acc_reduction_view); mi++) {
                 CUTLASS_PRAGMA_UNROLL
                 for (int ni = 0; ni < size<1>(acc_reduction_view); ni++) {
-                    if (!skip_mean_slot(ni)) {
-                        row_sum(mi) += acc_reduction_view(mi, ni);
-                    }
+                    accumulate_row_sum(mi, ni);
                 }
             }
         }
@@ -129,9 +136,7 @@ struct SoftmaxFused{
                 CUTLASS_PRAGMA_UNROLL
                 for (int ni = 0; ni < size<1>(acc_reduction_view); ni++) {
                     acc_reduction_view(mi, ni) = flash::ptx_exp2(acc_reduction_view(mi, ni) * softmax_scale_log2 - max_scaled);
-                    if (!skip_mean_slot(ni)) {
-                        row_sum(mi) += acc_reduction_view(mi, ni);
-                    }
+                    accumulate_row_sum(mi, ni);
                 }
                 CUTLASS_PRAGMA_UNROLL
                 for (int sfi = 0; sfi < size<1>(AbsMaxP); sfi++) {

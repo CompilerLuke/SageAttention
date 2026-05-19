@@ -24,15 +24,29 @@ template <
     typename SmemLayoutLambK
 >
 struct SharedStorageQKVOwithSF : cute::aligned_struct<128, _0> {
-    alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutQ>> smem_q;
-    alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutK>> smem_k;
-    ArrayEngine<ElementSF, cosize_v<SmemLayoutSFQ>> smem_SFQ;
-    ArrayEngine<ElementSF, cosize_v<SmemLayoutSFK>> smem_SFK;
-    ArrayEngine<ElementSF, cosize_v<SmemLayoutSFV>> smem_SFV;
-    alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutV>> smem_v;
-    alignas(1024) cute::ArrayEngine<OutputType, cute::cosize_v<SmemLayoutO>> smem_o;
-    alignas(1024) cute::ArrayEngine<float, cute::cosize_v<SmemLayoutLambK>> smem_lambK;
-    alignas(1024) cute::ArrayEngine<float, cute::cosize_v<SmemLayoutDS>> smem_ds;
+    struct QSmemStorage {
+        alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutQ>> smem_q;
+        ArrayEngine<ElementSF, cosize_v<SmemLayoutSFQ>> smem_SFQ;
+    };
+
+    struct KVSmemStorage {
+        alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutK>> smem_k;
+        alignas(1024) cute::ArrayEngine<Element, cute::cosize_v<SmemLayoutV>> smem_v;
+        ArrayEngine<ElementSF, cosize_v<SmemLayoutSFK>> smem_SFK;
+        ArrayEngine<ElementSF, cosize_v<SmemLayoutSFV>> smem_SFV;
+        alignas(1024) cute::ArrayEngine<float, cute::cosize_v<SmemLayoutLambK>> smem_lambK;
+        alignas(1024) cute::ArrayEngine<float, cute::cosize_v<SmemLayoutDS>> smem_ds;
+    };
+
+    union MainloopSmemStorage {
+        QSmemStorage q_smem;
+        KVSmemStorage kv_smem;
+    };
+
+    union {
+        MainloopSmemStorage mainloop_smem;
+        alignas(1024) cute::ArrayEngine<OutputType, cute::cosize_v<SmemLayoutO>> smem_o;
+    };
 
     struct {
         alignas(16) typename cutlass::PipelineTmaAsync<1>::SharedStorage pipeline_q;
