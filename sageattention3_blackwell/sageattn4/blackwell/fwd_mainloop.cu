@@ -1058,14 +1058,14 @@ struct Mainloop {
             set_mean_slot_to_first_score(tSrS, n_block);
             softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MeanSlotLanePeriod=*/kMeanSlotLanePeriod>(
                 tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
-            Tensor tOrO = make_fragment_like(tOrO_store);
+            softmax_fused.rescale_o_inplace(tOrO_store);
             consumer_wait(pipeline_v, smem_pipe_read_v);
             copy_v_block(_0{});
             quantize(_0{}, tSrS_converion_view);
             CUTLASS_PRAGMA_UNROLL
             for (int v_block = 0; v_block < size<2>(tOrP); ++v_block) {
                 cute::gemm(tiled_mma_pv, make_zip_tensor(tOrP(_, _, v_block), tOrSFP(_, _, v_block)), 
-                                    make_zip_tensor(tOrVt(_, _, v_block), tOrSFVt(_, _, v_block)), tOrO);
+                                    make_zip_tensor(tOrVt(_, _, v_block), tOrSFVt(_, _, v_block)), tOrO_store);
                 if (v_block < size<2>(tOrP) - 1) {
                     copy_v_block(v_block + 1);
                     quantize(v_block + 1, tSrS_converion_view);
@@ -1073,7 +1073,6 @@ struct Mainloop {
             }
             pipeline_v.consumer_release(smem_pipe_read_v);
             ++smem_pipe_read_v;
-            softmax_fused.rescale_o(tOrO_store, tOrO);
         }
 
         #pragma unroll 1
@@ -1101,14 +1100,14 @@ struct Mainloop {
             set_mean_slot_to_first_score(tSrS, n_block);
             softmax_fused.template online_softmax_with_quant</*Is_first=*/false, /*InfCheck=*/false, /*MeanSlotLanePeriod=*/kMeanSlotLanePeriod>(
                 tSrS, AbsMaxP, mainloop_params.softmax_scale_log2);
-            Tensor tOrO = make_fragment_like(tOrO_store);
+            softmax_fused.rescale_o_inplace(tOrO_store);
             consumer_wait(pipeline_v, smem_pipe_read_v);
             copy_v_block(_0{});
             quantize(_0{}, tSrS_converion_view);
             CUTLASS_PRAGMA_UNROLL
             for (int v_block = 0; v_block < size<2>(tOrP); ++v_block) {
                 cute::gemm(tiled_mma_pv, make_zip_tensor(tOrP(_, _, v_block), tOrSFP(_, _, v_block)), 
-                                    make_zip_tensor(tOrVt(_, _, v_block), tOrSFVt(_, _, v_block)), tOrO);
+                                    make_zip_tensor(tOrVt(_, _, v_block), tOrSFVt(_, _, v_block)), tOrO_store);
                 if (v_block < size<2>(tOrP) - 1) {
                     copy_v_block(v_block + 1);
                     quantize(v_block + 1, tSrS_converion_view);
@@ -1117,7 +1116,6 @@ struct Mainloop {
                     ++smem_pipe_read_v;
                 }
             }
-            softmax_fused.rescale_o(tOrO_store, tOrO);
         }
         softmax_fused.finalize(tOrO_store);
         cutlass::arch::NamedBarrier::sync(kNThreads, static_cast<uint32_t>(FP4NamedBarriers::MainloopMmaDone));

@@ -173,6 +173,18 @@ struct SoftmaxFused{
     }
 
     template<typename TensorAcc>
+    CUTLASS_DEVICE void rescale_o_inplace(TensorAcc& o_store) {
+        Tensor o_store_reduction_view = make_tensor(o_store.data(), flash::convert_to_reduction_layout(o_store.layout()));
+        CUTLASS_PRAGMA_UNROLL
+        for (int mi = 0; mi < size(row_max); ++mi) {
+            CUTLASS_PRAGMA_UNROLL
+            for (int ni = 0; ni < size<1>(o_store_reduction_view); ++ni) {
+                o_store_reduction_view(mi, ni) *= scores_scale(mi);
+             }
+        }
+    }
+
+    template<typename TensorAcc>
     CUTLASS_DEVICE void rescale_o(TensorAcc& o_store, TensorAcc const& o_tmp) {
         Tensor o_store_reduction_view = make_tensor(o_store.data(), flash::convert_to_reduction_layout(o_store.layout()));
         Tensor o_tmp_reduction_view = make_tensor(o_tmp.data(), flash::convert_to_reduction_layout(o_tmp.layout()));
